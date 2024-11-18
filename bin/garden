@@ -1,0 +1,146 @@
+#!/bin/bash
+
+GARDEN_DIR="$HOME/.garden"
+SEEDS_FILE="$GARDEN_DIR/seeds"
+BIN_DIR="$GARDEN_DIR/bin"
+
+# Ensure necessary directories exist
+mkdir -p "$GARDEN_DIR" "$BIN_DIR"
+
+# Function to expand a tilde (~) to the full home directory path
+expand_path() {
+    echo "$1" | sed "s|^~|$HOME|"
+}
+
+# Function to compress full home directory path to ~
+compress_path() {
+    echo "$1" | sed "s|^$HOME|~|"
+}
+
+# Function to ensure sudo permissions if required
+check_sudo() {
+    if [ "$EUID" -ne 0 ]; then
+        echo "This action may require sudo permissions. Please re-run as sudo if needed."
+        exit 1
+    fi
+}
+
+# Function to handle `garden seed`
+# TODO: moving of files doesnt work - it only creates another sylink and moves the file.
+# it creates an unnecessary symlink in the garden directory
+seed() {
+    local path="$1"
+    local to="$2"
+    local abs_path
+    abs_path=$(readlink -f "$(expand_path "$path")")
+    local target="$GARDEN_DIR/${to:-$(basename "$path")}"
+    local orig_path=$(compress_path "$abs_path")
+
+    # Check if the file exists
+    if [ ! -e "$path" ]; then
+        echo "$path does not exist. Would you like to create it? (y/n)"
+        read -r create
+        if [ "$create" != "y" ]; then
+            echo "Aborting."
+            exit 1
+        fi
+        touch "$path"
+    fi
+
+    # Handle existing entries
+    # TODO: mozgatas
+    if grep -q "|$orig_path" "$SEEDS_FILE"; then
+        echo "File already seeded at $orig_path. Updating symlink."
+        ln -sf "$target" "$path"
+        return
+    fi
+
+    # Move file, create symlink, and add to seeds
+    mkdir -p "$(dirname "$target")"
+    mv "$abs_path" "$target"
+    ln -s "$target" "$path"
+    echo "$(realpath --relative-to="$GARDEN_DIR" "$target")|$orig_path" >>"$SEEDS_FILE"
+    echo "Seeded $path to $target"
+}
+
+# Function to handle `garden remove`
+remove() {
+    local path
+    path=$(compress_path "$(expand_path "$1")")
+    local entry
+    entry=$(grep "$path|" "$SEEDS_FILE")
+
+    if [ -z "$entry" ]; then
+        echo "File not found in seeds."
+        exit 1
+    fi
+
+    local file="${entry%%|*}"
+    local orig="${entry##*|}"
+
+    # Remove symlink and garden file
+    rm -f "$(expand_path "$orig")" "$GARDEN_DIR/$file"
+    sed -i "\|$path|d" "$SEEDS_FILE"
+    echo "Removed $path and its entry from seeds."
+}
+
+# Function to handle `garden grow`
+# cannot establish symlinks :/
+grow() {
+    chmod +x "$BIN_DIR"/*
+    echo "Growing garden..."
+    while IFS='|' read -r file orig; do
+        local target="$GARDEN_DIR/$file"
+        local orig_expanded
+        orig_expanded=$(expand_path "$orig")
+
+        echo "$orig_expanded -> $target"
+
+        if [ -e "$target" ] && [ -L "$orig_expanded" ] && [ "$(readlink -f "$orig_expanded")" = "$target" ]; then
+            continue
+        fi
+
+        if [ -e "$target" ] && [ ! -L "$orig_expanded" ]; then
+            echo "Fixing symlink for $orig_expanded"
+            ln -sf "$target" "$orig_expanded"
+        elif [ -e "$target" ]; then
+            echo "Recreating symlink for $orig_expanded"
+            ln -s "$target" "$orig_expanded"
+        else
+            echo "File $target not found. Removing entry."
+            sed -i "\|$file|d" "$SEEDS_FILE"
+        fi
+    done <"$SEEDS_FILE"
+
+    echo "Garden has grown."
+}
+
+# Function to handle `garden list`
+list() {
+    cat "$SEEDS_FILE" | column -t -s '|'
+}
+
+# Main command handler
+case "$1" in
+seed)
+    seed "$2" "$3"
+    ;;
+remove)
+    remove "$2"
+    ;;
+grow)
+    grow
+    ;;
+list)
+    list
+    ;;
+*)
+    echo "Usage: garden <command> [options]"
+    echo "Commands:"
+    echo "  seed <path> [to]    - Seed a file into the garden."
+    echo "  remove <path>       - Remove a file and its entry from the garden."
+    echo "  grow                - Regrow symlinks and clean the garden."
+    echo "  list                - List all garden entries."
+    exit 1
+    ;;
+esac

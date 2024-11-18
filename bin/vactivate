@@ -1,0 +1,56 @@
+#!/bin/bash
+
+ISOLATED=false
+
+# Parse command-line options
+while getopts "i" opt; do
+    case $opt in
+        i)
+            ISOLATED=true
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Shift off the options so that "$@" contains only the remaining arguments
+shift $((OPTIND - 1))
+
+# Check if a name was provided as an argument
+if [ -z "$1" ]; then
+    echo "Usage: $0 <venv_name>"
+    exit 1
+fi
+
+# Define the path to the virtual environment using the provided name
+VENV_NAME="$1"
+VENV_PATH="$HOME/.venv/$VENV_NAME"
+VENV_PATH_SYSTEM="$HOME/.venv/system"
+
+# Check if the virtual system environment exists 
+if [[ ! -d "$VENV_PATH_SYSTEM" && "$ISOLATED" == false ]]; then
+    echo "System venv not found. Create it using 'vactivate -i system'"
+    exit 1
+fi
+
+# Create virtual environment if it doesnt exist
+if [ ! -d "$VENV_PATH" ]; then
+    read -p "Virtual environment '$VENV_NAME' not found at $VENV_PATH. Would you like to create one? (Y/n): " response
+	if [[ "$response" == "y" || "$response" == "Y" || "$response" == "" ]]; then
+		python3 -m venv "$VENV_PATH"
+        	echo "Virtual environment '$VENV_NAME' created at $VENV_PATH."
+    	else
+        	echo "No virtual environment created. Exiting."
+        	exit 1
+    	fi
+fi
+
+# Activate system environment if isolation mode is off
+if [[ "$ISOLATED" == false ]]; then
+	echo "Activating system environment.."
+	source "$VENV_PATH_SYSTEM/bin/activate"
+fi
+
+source "$VENV_PATH/bin/activate"
