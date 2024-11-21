@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Install rustup and set up stable Rust in one step
+echo "Installing rustup..."
+pacman -S base-devel rustup --noconfirm
+rustup default stable
+
+# Check for paru, install if not present
+if ! command -v paru &> /dev/null; then
+  echo "Installing paru..."
+  git clone https://aur.archlinux.org/paru.git
+  cd paru || exit
+  makepkg -si --noconfirm
+  cd ..
+  rm -rf paru
+fi
+
+#!/bin/bash
+
+# Define the ignored packages NOT USED!
+IGNORED_PACKAGES="bitwig-studio"
+
+# Input file containing the package list
+INPUT_FILE="$HOME/.garden/packages"
+
+# Check if the input file exists
+if [ -f "$INPUT_FILE" ]; then
+  echo "Installing packages from $INPUT_FILE..."
+
+  # Initialize an array to hold the packages
+  PACKAGES=()
+
+  # Read the file line by line
+  while IFS= read -r package; do
+    # Skip empty lines and comments
+    [[ -z "$package" || "$package" =~ ^# ]] && continue
+    # Add the package to the list
+    PACKAGES+=("$package")
+  done < "$INPUT_FILE"
+
+  # Run paru with all the packages at once
+  if [[ ${#PACKAGES[@]} -gt 0 ]]; then
+    paru -S --needed --noconfirm "${PACKAGES[@]}"
+  else
+    echo "No valid packages to install."
+  fi
+else
+  echo "Package list file $INPUT_FILE not found."
+  exit 1
+fi
+
