@@ -11,6 +11,9 @@ PS1='[\u@\h \W]\$ '
 
 export PATH="$HOME/.garden/bin:$PATH"
 
+# for testing fabric
+export GDK_BACKEND=wayland
+
 alias vactivate='. vactivate'
 
 function y() {
