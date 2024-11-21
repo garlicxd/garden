@@ -2,10 +2,8 @@
 amd-ucode
 base
 base-devel
-bitwig-studio
 btrfs-progs
 debtap
-dragon-drop
 efibootmgr
 gdb
 git
@@ -13,13 +11,14 @@ gnome-bluetooth
 grub
 gst-plugin-pipewire
 gtk-layer-shell
-helvum
 hypridle
 hyprland
 hyprlock
 hyprpaper
+hyprpicker
 hyprpolkitagent-git
 hyprshot
+hyprsysteminfo-git
 lib32-mesa
 lib32-vulkan-radeon
 libpulse
@@ -47,13 +46,6 @@ pipewire-alsa
 pipewire-jack
 pipewire-pulse
 pwvucontrol
-python-cairo
-python-fabric-git
-python-gobject
-python-loguru
-python-pip
-python-psutil
-python-pyperclip
 qt5-wayland
 qt6-wayland
 reflector
@@ -74,19 +66,15 @@ zen-browser-bin
 
 # AUR Packages
 7-zip-full
-bitwig-studio
 debtap
-dragon-drop
 gconf
 hyprpolkitagent-git
 hyprshot
+hyprsysteminfo-git
 hyprutils-git
-libwireplumber-4.0-compat
 mega
 otf-stix
 paru
-pwvucontrol
-python-fabric-git
 stremio-beta
 vesktop-git
 visual-studio-code-bin

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GARDEN_DIR="$HOME/.garden"
+GARDEN_DIR="$HOME/garden"
 SEEDS_FILE="$GARDEN_DIR/seeds"
 BIN_DIR="$GARDEN_DIR/bin"
 
@@ -105,7 +105,7 @@ grow() {
             ln -sf "$target" "$orig_expanded"
         elif [ -e "$target" ]; then
             echo "Recreating symlink for $orig_expanded"
-            ln -s "$target" "$orig_expanded"
+            ln -sf "$target" "$orig_expanded"
         else
             echo "File $target not found. Removing entry."
             sed -i "\|$file|d" "$SEEDS_FILE"

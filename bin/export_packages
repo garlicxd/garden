@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the output file location
-OUTPUT_FILE="$HOME/.garden/packages"
+OUTPUT_FILE="$HOME/garden/packages"
 
 # Create the directory if it doesn't exist
 mkdir -p "$(dirname "$OUTPUT_FILE")"
