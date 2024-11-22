@@ -1,22 +1,5 @@
 #!/bin/bash
 
-# Install rustup and set up stable Rust in one step
-echo "Installing rustup..."
-pacman -S base-devel rustup --noconfirm
-rustup default stable
-
-# Check for paru, install if not present
-if ! command -v paru &> /dev/null; then
-  echo "Installing paru..."
-  git clone https://aur.archlinux.org/paru.git
-  cd paru || exit
-  makepkg -si --noconfirm
-  cd ..
-  rm -rf paru
-fi
-
-#!/bin/bash
-
 # Input file containing the package list
 INPUT_FILE="$HOME/garden/root/packages"
 

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+chmod -R +x ./root/
+
+# Install rustup and set up stable Rust in one step
+echo "Installing rustup..."
+sudo -E pacman -Sy base-devel rustup
+rustup default stable
+
+# Check for paru, install if not present
+if ! command -v paru &> /dev/null; then
+  echo "Installing paru..."
+  git clone https://aur.archlinux.org/paru.git
+  cd paru || exit
+  makepkg -si --noconfirm
+  cd ..
+  rm -rf paru
+fi
