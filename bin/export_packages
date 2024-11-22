@@ -10,8 +10,8 @@ mkdir -p "$(dirname "$OUTPUT_FILE")"
 pacman -Qqe > "$OUTPUT_FILE"
 
 # Append AUR packages with a separator
-echo -e "\n# AUR Packages" >> "$OUTPUT_FILE"
-pacman -Qqm >> "$OUTPUT_FILE"
+# echo -e "\n# AUR Packages" >> "$OUTPUT_FILE"
+# pacman -Qqm >> "$OUTPUT_FILE"
 
 echo "Packages exported to $OUTPUT_FILE."
 

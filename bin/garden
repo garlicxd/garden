@@ -102,11 +102,11 @@ grow() {
 
         if [ -e "$target" ] && [ ! -L "$orig_expanded" ]; then
             echo "Fixing symlink for $orig_expanded"
-	    mkdir -p "$(dirname "$orig_expanded")"
+	        mkdir -p "$(dirname "$orig_expanded")"
             ln -sf "$target" "$orig_expanded"
         elif [ -e "$target" ]; then
             echo "Recreating symlink for $orig_expanded"
-	    mkdir -p "$(dirname "$orig_expanded")"
+	        mkdir -p "$(dirname "$orig_expanded")"
             ln -sf "$target" "$orig_expanded"
         else
             echo "File $target not found. Removing entry."
