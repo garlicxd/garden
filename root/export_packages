@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Define the output file location
+OUTPUT_FILE="$HOME/garden/root/packages"
+IGNORE_FILE="$HOME/garden/root/pkgignore"
+
+# Create the directory if it doesn't exist
+mkdir -p "$(dirname "$OUTPUT_FILE")"
+
+# Check if the pkgignore file exists, and read the ignored packages
+if [[ -f "$IGNORE_FILE" ]]; then
+    IGNORED_PACKAGES=$(cat "$IGNORE_FILE" | tr '\n' '|' | sed 's/|$//')  # Convert lines into a regex string
+else
+    IGNORED_PACKAGES=""  # No packages to ignore if file doesn't exist
+fi
+
+# Export explicitly installed official packages, excluding ignored packages
+if [[ -n "$IGNORED_PACKAGES" ]]; then
+    pacman -Qqe | grep -v -E "$IGNORED_PACKAGES" > "$OUTPUT_FILE"
+else
+    pacman -Qqe > "$OUTPUT_FILE"
+fi
+
+# Optional: Export AUR packages and exclude ignored ones (uncomment if needed)
+# if [[ -n "$IGNORED_PACKAGES" ]]; then
+#     pacman -Qqm | grep -v -E "$IGNORED_PACKAGES" >> "$OUTPUT_FILE"
+# else
+#     pacman -Qqm >> "$OUTPUT_FILE"
+# fi
+
+echo "Packages exported to $OUTPUT_FILE."
+
+

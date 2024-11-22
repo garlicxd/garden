@@ -17,11 +17,8 @@ fi
 
 #!/bin/bash
 
-# Define the ignored packages NOT USED!
-IGNORED_PACKAGES="bitwig-studio"
-
 # Input file containing the package list
-INPUT_FILE="$HOME/garden/packages"
+INPUT_FILE="$HOME/garden/root/packages"
 
 # Check if the input file exists
 if [ -f "$INPUT_FILE" ]; then

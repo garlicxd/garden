@@ -1,7 +1,7 @@
 #!/bin/bash
 
 GARDEN_DIR="$HOME/garden"
-SEEDS_FILE="$GARDEN_DIR/seeds"
+SEEDS_FILE="$GARDEN_DIR/root/seeds"
 BIN_DIR="$GARDEN_DIR/bin"
 
 # Ensure necessary directories exist
