@@ -1,13 +1,15 @@
 #!/bin/bash
 
 GARDEN_DIR="$HOME/garden"
-SEEDS_FILE="$GARDEN_DIR/root/seeds"
+FLOWERS_DIR="$GARDEN_DIR/seeds"
+SEEDS_FILE="$GARDEN_DIR/seeds"
 BIN_DIR="$GARDEN_DIR/bin"
 
 # Ensure necessary directories exist
 mkdir -p "$GARDEN_DIR" "$BIN_DIR"
 
 # Function to expand a tilde (~) to the full home directory path
+# TODO: add support for files outsid garden
 expand_path() {
     echo "$1" | sed "s|^~|$HOME|"
 }
@@ -25,9 +27,6 @@ check_sudo() {
     fi
 }
 
-# Function to handle `garden seed`
-# TODO: moving of files doesnt work - it only creates another sylink and moves the file.
-# it creates an unnecessary symlink in the garden directory
 seed() {
     local path="$1"
     local to="$2"
@@ -47,21 +46,49 @@ seed() {
         touch "$path"
     fi
 
-    # Handle existing entries
-    # TODO: mozgatas
+    # Check if file is already seeded in the `seeds` file
     if grep -q "|$orig_path" "$SEEDS_FILE"; then
         echo "File already seeded at $orig_path. Updating symlink."
         ln -sf "$target" "$path"
         return
     fi
 
-    # Move file, create symlink, and add to seeds
+    # Handle when the absolute path is already listed in the `seeds` file
+    # and there's a valid target path specified in `to`
+    if grep -q "^$(realpath --relative-to="$GARDEN_DIR" "$abs_path")|" "$SEEDS_FILE" && [ -n "$to" ]; then
+        echo "Moving the file from $abs_path to $target."
+
+        # Ensure the target directory exists
+        mkdir -p "$(dirname "$target")"
+
+        # Move the file to the new target location
+        mv "$abs_path" "$target"
+
+        # Extract the second column (original path) from the seeds file
+        local link_path
+        link_path=$(grep "^$(realpath --relative-to="$GARDEN_DIR" "$abs_path")|" "$SEEDS_FILE" | cut -d'|' -f2)
+
+        echo "$link_path"
+        echo "$target"
+
+        # Update the symlink
+        ln -sf "$target" $(expand_path "$link_path")
+
+        # Update the SEEDS_FILE by replacing the old path with the new one
+        sed -i "s|^$(realpath --relative-to="$GARDEN_DIR" "$abs_path")|$(realpath --relative-to="$GARDEN_DIR" "$target")|g" "$SEEDS_FILE"
+
+        echo "Updated symlink and moved the file."
+        return
+    fi
+
+    # Move the file to the garden or specified path, create symlink, and update seeds
     mkdir -p "$(dirname "$target")"
     mv "$abs_path" "$target"
     ln -s "$target" "$path"
-    echo "$(realpath --relative-to="$GARDEN_DIR" "$target")|$orig_path" >>"$SEEDS_FILE"
+    echo "$(realpath --relative-to="$GARDEN_DIR" "$target")|$orig_path" >> "$SEEDS_FILE"
     echo "Seeded $path to $target"
 }
+
 
 # Function to handle `garden remove`
 remove() {
@@ -85,7 +112,6 @@ remove() {
 }
 
 # Function to handle `garden grow`
-# cannot establish symlinks :/
 grow() {
     chmod +x "$BIN_DIR"/*
     echo "Growing garden..."
@@ -102,11 +128,11 @@ grow() {
 
         if [ -e "$target" ] && [ ! -L "$orig_expanded" ]; then
             echo "Fixing symlink for $orig_expanded"
-	        mkdir -p "$(dirname "$orig_expanded")"
+            mkdir -p "$(dirname "$orig_expanded")"
             ln -sf "$target" "$orig_expanded"
         elif [ -e "$target" ]; then
             echo "Recreating symlink for $orig_expanded"
-	        mkdir -p "$(dirname "$orig_expanded")"
+            mkdir -p "$(dirname "$orig_expanded")"
             ln -sf "$target" "$orig_expanded"
         else
             echo "File $target not found. Removing entry."
@@ -120,6 +146,47 @@ grow() {
 # Function to handle `garden list`
 list() {
     cat "$SEEDS_FILE" | column -t -s '|'
+}
+
+# Function to handle `garden edit`
+edit() {
+    local prompt="$1"
+    if [ -z "$prompt" ]; then
+        echo "Please provide a search term for edit."
+        exit 1
+    fi
+
+    # Use `fd` to search for files
+    local results
+    results=$(fd --type f  "$prompt" "$GARDEN_DIR")
+
+    if [ -z "$results" ]; then
+        echo "No files found for: $prompt"
+        exit 1
+    fi
+
+    # Convert results into an array
+    IFS=$'\n' read -r -d '' -a files <<<"$results" || true
+
+    if [ "${#files[@]}" -eq 1 ]; then
+        # Open the single file with nvim
+        nvim "${files[0]}"
+    else
+        echo "Multiple files found:"
+        for i in "${!files[@]}"; do
+            echo "$((i + 1)). $(compress_path "${files[i]}")"
+        done
+
+        echo "Enter the number of the file you want to open:"
+        read -r choice
+
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#files[@]}" ]; then
+            nvim "${files[$((choice - 1))]}"
+        else
+            echo "Invalid choice. Exiting."
+            exit 1
+        fi
+    fi
 }
 
 # Main command handler
@@ -136,6 +203,9 @@ grow)
 list)
     list
     ;;
+edit)
+    edit "$2"
+    ;;
 *)
     echo "Usage: garden <command> [options]"
     echo "Commands:"
@@ -143,6 +213,7 @@ list)
     echo "  remove <path>       - Remove a file and its entry from the garden."
     echo "  grow                - Regrow symlinks and clean the garden."
     echo "  list                - List all garden entries."
+    echo "  edit <prompt>       - Search and edit a file by prompt."
     exit 1
     ;;
 esac

@@ -4,6 +4,7 @@ base
 base-devel
 btrfs-progs
 efibootmgr
+fd
 gdb
 git
 gnome-bluetooth-3.0

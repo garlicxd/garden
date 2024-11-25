@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the output file location
-OUTPUT_FILE="$HOME/garden/root/packages"
-IGNORE_FILE="$HOME/garden/root/pkgignore"
+OUTPUT_FILE="$HOME/garden/packages"
+IGNORE_FILE="$HOME/garden/pkgignore"
 
 # Create the directory if it doesn't exist
 mkdir -p "$(dirname "$OUTPUT_FILE")"

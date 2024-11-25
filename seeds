@@ -1,0 +1,13 @@
+flowers/bash/.bashrc|~/.bashrc
+flowers/bash/.bash_profile|~/.bash_profile
+flowers/bash/.profile|~/.profile
+flowers/hypr/hyprland.conf|~/.config/hypr/hyprland.conf
+flowers/hypr/hyprpaper.conf|~/.config/hypr/hyprpaper.conf
+flowers/hypr/hyprlock.conf|~/.config/hypr/hyprlock.conf
+flowers/hypr/hypridle.conf|~/.config/hypr/hypridle.conf
+flowers/wezterm/wezterm.lua|~/.config/wezterm/wezterm.lua
+flowers/yazi/keymap.toml|~/.config/yazi/keymap.toml
+flowers/yazi/yazi.toml|~/.config/yazi/yazi.toml
+flowers/mixxx/reloop-dj2-ie-midi.xml|~/.mixxx/controllers/Reloop-Digital-Jockey-2-IE.midi.xml
+flowers/mixxx/reloop-dj2-ie-scripts.js|~/.mixxx/controllers/Reloop-Digital-Jockey-2-IE.scripts.js
+flowers/.gitconfig|~/.gitconfig

@@ -62,15 +62,17 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg
 ```
 ###  Setup git
 - [ ] [Generating a new SSH key and adding it to the ssh-agent](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent)
+
 ### Dotfiles
 Install [dotfiles](https://github.com/garlicxd/garden).
-1. run `sudo pacman -S git && mkdir ~/.garden/ && git clone https://github.com/garlicxd/garden.git ~/.garden/ && chmod +x ~/.garden/bin/garden`
+1. run `cd && sudo pacman -S git && git clone https://github.com/garlicxd/garden.git && chmod +x ~/garden/init`
 2. run `garden grow`
 3. run `install_packages`
 
 ## TODO
 - [ ] configure theme consistently
     - [ ] gtk theme
+- [ ] waiting for fabric to have a normal pkgbuild
 - [X] configure a consistent font: noto or nerd noto. For mono: roboto.
 - [X] shell script to handle dotfiles in a single folder and log symlinks
 - [X] shell script to restore sylinks from the log
