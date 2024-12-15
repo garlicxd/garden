@@ -2,12 +2,12 @@
 amd-ucode
 base
 base-devel
+bluez
 btrfs-progs
 efibootmgr
 fd
 gdb
 git
-gnome-bluetooth-3.0
 hypridle
 hyprland
 hyprlock
@@ -41,8 +41,6 @@ pipewire
 pipewire-alsa
 pipewire-jack
 pipewire-pulse
-python-fabric-git
-python-psutil
 qt5-wayland
 qt6-wayland
 reflector
