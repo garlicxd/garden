@@ -1,0 +1,103 @@
+#!/bin/bash
+# niri touchscreen gesture daemon (lisgd)
+# Auto-detects the touchscreen device and provides swipe gestures.
+# Uses edge swipes to avoid conflicting with app touch input.
+
+set -euo pipefail
+
+# --- Configuration ---
+THRESHOLD=80
+PRESS_THRESHOLD=30
+
+# --- Detect touch device ---
+detect_touch_device() {
+    # 1. Try symlinks in /dev/input/by-id/ (USB/bluetooth touchscreens)
+    for pattern in \
+        "/dev/input/by-id/*-Touchscreen-*event*" \
+        "/dev/input/by-id/*touchscreen*event*" \
+        "/dev/input/by-id/*Touch*event*" \
+        "/dev/input/by-id/*touch*event*"; do
+        for dev in $pattern; do
+            if [ -e "$dev" ]; then
+                echo "$dev"
+                return 0
+            fi
+        done
+    done
+
+    # 2. Scan /dev/input/event* with udevadm (i2c/internal touchscreens)
+    for ev in /dev/input/event*; do
+        if [ -e "$ev" ] && udevadm info --query=property --name="$ev" 2>/dev/null | grep -q "ID_INPUT_TOUCHSCREEN=1"; then
+            echo "$ev"
+            return 0
+        fi
+    done
+
+    # 3. Fallback via libinput
+    if command -v libinput &>/dev/null; then
+        device=$(libinput list-devices 2>/dev/null | grep -B 2 "TouchScreen\|Touchscreen\|touchscreen" | grep -oP '/dev/input/event\S+' | head -1)
+        if [ -n "$device" ]; then
+            echo "$device"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# --- Find niri msg ---
+NIRI_MSG="niri msg"
+if ! command -v niri &>/dev/null; then
+    echo "Error: niri not found." >&2
+    exit 1
+fi
+SCROLL_H="/home/garlic/.local/bin/niri/scroll-h"
+
+# --- Detect device ---
+DEVICE=$(detect_touch_device)
+if [ -z "$DEVICE" ]; then
+    echo "Error: No touchscreen device found." >&2
+    echo "Available:" >&2
+    ls -la /dev/input/by-id/ 2>/dev/null || true
+    ls /dev/input/event* 2>/dev/null | head -5
+    exit 1
+fi
+echo "Using touch device: $DEVICE"
+
+# --- Stop existing lisgd ---
+pkill -f "lisgd -d $DEVICE" 2>/dev/null || true
+
+# --- Start lisgd ---
+# Format: nfingers,gesture,edge,distance,actmode,command
+# gesture: LR RL UD DU (also diagonals: DLUR URDL ULDR DRUL)
+# edge: L R T B * (any) N (none)
+# distance: * S M L
+# actmode: R (release) P (pressed) — omitting defaults to R
+
+lisgd -d "$DEVICE" \
+    -t "$THRESHOLD" \
+    -T "$PRESS_THRESHOLD" \
+    -g "1,LR,L,*,R,wtype -M alt -P Left -p Left -m alt" \
+    -g "1,RL,R,*,R,wtype -M alt -P Left -p Left -m alt" \
+    -g "1,DU,T,*,R,$NIRI_MSG action toggle-overview" \
+    -g "1,UD,B,*,R,$NIRI_MSG action toggle-overview" \
+    -g "3,RL,*,*,R,$SCROLL_H left" \
+    -g "3,LR,*,*,R,$SCROLL_H right" \
+    -g "3,UD,*,*,R,$NIRI_MSG action focus-workspace-up" \
+    -g "3,DU,*,*,R,$NIRI_MSG action focus-workspace-down" \
+    2>&1 &
+
+LISGD_PID=$!
+echo "lisgd started (PID: $LISGD_PID)"
+echo ""
+echo "Active gestures:"
+echo "  ← Edge-left swipe  → Back (Alt+Left)"
+echo "  → Edge-right swipe → Back (Alt+Left)"
+echo "  ↓ Edge-top swipe   → toggle-overview"
+echo "  ↑ Edge-bottom swipe → toggle-overview"
+echo "  ← 3-finger swipe   → scroll left"
+echo "  → 3-finger swipe   → scroll right"
+echo "  ↑ 3-finger swipe   → workspace-up"
+echo "  ↓ 3-finger swipe   → workspace-down"
+
+trap "kill $LISGD_PID 2>/dev/null; exit" INT TERM
+wait $LISGD_PID

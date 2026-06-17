@@ -1,0 +1,8 @@
+#!/bin/bash
+# Rotate screen to normal (landscape)
+# Usage: rotate_normal [output-name]
+# Default output: eDP-1
+
+OUTPUT="${1:-eDP-1}"
+niri msg output "$OUTPUT" transform "normal"
+echo "→ Rotated $OUTPUT to normal (landscape)"

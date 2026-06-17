@@ -1,0 +1,52 @@
+#!/bin/bash
+# Update noctalia bar position to keep it on the same physical edge
+# after the screen is rotated.
+#
+# Usage: update-bar-position <bar-name> <transform>
+#   bar-name:  the noctalia bar name (default: "default")
+#   transform: normal | 90 | 180 | 270
+#
+# Maps niri transforms → noctalia positions so the bar stays on the
+# same physical edge. For a right-side bar:
+#   normal → right    (bar on physical right)
+#   90     → bottom   (bar on physical right)
+#   180    → left     (bar on physical right)
+#   270    → top      (bar on physical right)
+
+BAR="${1:-default}"
+TRANSFORM="${2:-normal}"
+SETTINGS="$HOME/.local/state/noctalia/settings.toml"
+ORIGINAL_EDGE="right"  # change this if your bar is on a different edge
+
+# Map transform to bar position to keep bar on ORIGINAL_EDGE
+# This rotates the bar position opposite to the screen rotation
+case "$ORIGINAL_EDGE-$TRANSFORM" in
+    right-normal)  NEW_POS="right"   ;;
+    right-90)      NEW_POS="bottom"  ;;
+    right-180)     NEW_POS="left"    ;;
+    right-270)     NEW_POS="top"     ;;
+    left-normal)   NEW_POS="left"    ;;
+    left-90)       NEW_POS="top"     ;;
+    left-180)      NEW_POS="right"   ;;
+    left-270)      NEW_POS="bottom"  ;;
+    top-normal)    NEW_POS="top"     ;;
+    top-90)        NEW_POS="right"   ;;
+    top-180)       NEW_POS="bottom"  ;;
+    top-270)       NEW_POS="left"    ;;
+    bottom-normal) NEW_POS="bottom"  ;;
+    bottom-90)     NEW_POS="left"    ;;
+    bottom-180)    NEW_POS="top"     ;;
+    bottom-270)    NEW_POS="right"   ;;
+    *)             NEW_POS="$ORIGINAL_EDGE" ;;
+esac
+
+# Update the noctalia settings and reload
+if [ -f "$SETTINGS" ]; then
+    # Get current position
+    CURRENT=$(grep "^position" "$SETTINGS" | head -1 | awk -F'"' '{print $2}')
+    if [ "$CURRENT" != "$NEW_POS" ]; then
+        sed -i "s/^position = \".*\"/position = \"$NEW_POS\"/" "$SETTINGS"
+        noctalia msg config-reload 2>/dev/null
+        echo "→ noctalia bar '$BAR': $CURRENT → $NEW_POS"
+    fi
+fi

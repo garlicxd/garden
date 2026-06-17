@@ -1,0 +1,8 @@
+#!/bin/bash
+# Rotate screen 90° (portrait right)
+# Usage: rotate_90 [output-name]
+# Default output: eDP-1
+
+OUTPUT="${1:-eDP-1}"
+niri msg output "$OUTPUT" transform "90"
+echo "→ Rotated $OUTPUT to 90° (portrait right)"

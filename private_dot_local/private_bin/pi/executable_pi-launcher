@@ -1,0 +1,5 @@
+#!/bin/bash
+# pi-launcher - Launch Pi Coding Agent in a selected project directory.
+
+exec kitty --class=pi --title="Pi Launcher" \
+  /home/garlic/.local/bin/pi/pi-picker

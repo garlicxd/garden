@@ -1,0 +1,40 @@
+layout {
+
+    focus-ring {
+        // 1px highlight border using Noctalia's dynamic palette.
+        width 1
+        active-color   "{{colors.primary.default.hex}}"
+        inactive-color "{{colors.surface.default.hex}}"
+        urgent-color   "{{colors.error.default.hex}}"
+    }
+
+    border {
+        width 1
+        active-color   "{{colors.primary.default.hex}}"
+        inactive-color "{{colors.surface_container_low.default.hex}}"
+        urgent-color   "{{colors.error.default.hex}}"
+    }
+
+    shadow {
+        // Subtle shadow using the surface color at low opacity.
+        color "{{colors.surface.default.hex | set_alpha 0.44}}"
+    }
+
+    tab-indicator {
+        active-color   "{{colors.primary.default.hex}}"
+        inactive-color "{{colors.surface_container_low.default.hex}}"
+        urgent-color   "{{colors.error.default.hex}}"
+    }
+
+    insert-hint {
+        // Translucent primary accent for column insertion hints.
+        color "{{colors.primary.default.hex | set_alpha 0.50}}"
+    }
+}
+
+recent-windows {
+    highlight {
+        active-color "{{colors.primary.default.hex}}"
+        urgent-color "{{colors.error.default.hex}}"
+    }
+}

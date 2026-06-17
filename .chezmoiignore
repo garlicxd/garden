@@ -1,0 +1,12 @@
+# Node modules - should be installed via package manager
+.pi/agent/npm/node_modules
+.pi/npm/node_modules
+
+# Sessions contain JWTs and API keys
+.pi/agent/sessions
+
+# Auth file contains API keys
+.pi/agent/auth.json
+
+# Compiled binaries in .pi/agent/bin (platform-specific)
+.pi/agent/bin

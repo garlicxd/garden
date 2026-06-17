@@ -1,0 +1,8 @@
+#!/bin/bash
+# Rotate screen 180° (upside down)
+# Usage: rotate_180 [output-name]
+# Default output: eDP-1
+
+OUTPUT="${1:-eDP-1}"
+niri msg output "$OUTPUT" transform "180"
+echo "→ Rotated $OUTPUT to 180° (inverted)"

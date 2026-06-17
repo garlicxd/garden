@@ -1,0 +1,201 @@
+#!/bin/bash
+# pi/pi-picker - Pick a project directory and launch Pi Coding Agent.
+# Flower petal on the left, project list on the right.
+# Animated π eye with blinks — cursor hidden during animation.
+
+set -uo pipefail
+PI_CMD="${PI_CMD:-pi}"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/pi-launcher"
+mkdir -p "$CACHE_DIR"
+
+trap 'printf "\033[?25h"; echo ""; echo "Cancelled."; exit 1' INT
+trap 'printf "\033[?25h"' EXIT
+
+# ── Petal lines ──────────────────────────────────────────────────────────
+P0='        .-"-.    '
+P1='       /     \   '
+P2='      /       \  '
+PC='     |    π    | '
+PL='     |  π      | '
+PR='     |      π  | '
+PB='     |         | '
+P4='      \       /  '
+P5='       \     /   '
+P6="        \`-.-'    "
+
+petal_mid() {
+    case "${1:-0}" in
+        1) echo "$PL" ;;
+        2) echo "$PR" ;;
+        3) echo "$PB" ;;
+        *) echo "$PC" ;;
+    esac
+}
+
+petal_width=18
+CURSOR_COL=$((petal_width + 2 + 3))
+
+pad_left() {
+    local s="$1"; local len=${#s}
+    if [ "$len" -lt "$petal_width" ]; then
+        printf "%s%*s" "$s" $((petal_width - len)) ""
+    else
+        printf "%s" "$s"
+    fi
+}
+
+home_tilde() {
+    local p="$1"
+    if [[ "$p" == "$HOME" ]]; then echo "~"
+    elif [[ "$p" == "$HOME"/* ]]; then echo "~/${p#$HOME/}"
+    else echo "$p"
+    fi
+}
+
+# ── Scan for pi session directories ──────────────────────────────────────
+scan_projects() {
+    local session_base="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/sessions"
+    local dirs=()
+    if [ -d "$session_base" ]; then
+        shopt -s nullglob
+        for session_dir in "$session_base"/--*--/; do
+            local first_file
+            first_file=$(ls "$session_dir"*.jsonl 2>/dev/null | head -1)
+            [ -n "$first_file" ] || continue
+            local cwd
+            cwd=$(head -1 "$first_file" 2>/dev/null | grep -o '"cwd":"[^"]*"' | head -1 | cut -d'"' -f4)
+            [ -n "$cwd" ] && [ -d "$cwd" ] && dirs+=("$cwd")
+        done
+        shopt -u nullglob
+    fi
+    printf "%s\n" "${dirs[@]}" | sort -u | grep -vFx "$HOME" | while IFS= read -r d; do
+        if [ -d "$d" ]; then
+            echo "$(stat -c '%Y' "$d" 2>/dev/null || echo 0)|$d"
+        fi
+    done | sort -t'|' -k1 -rn | cut -d'|' -f2-
+}
+
+build_menu() {
+    local scan_cache="$CACHE_DIR/scan.txt"
+    local recent_file="$CACHE_DIR/recent.txt"
+    if [ -f "$scan_cache" ]; then
+        local cache_age=$(($(date +%s) - $(stat -c '%Y' "$scan_cache" 2>/dev/null || echo 0)))
+        [ "$cache_age" -ge 300 ] && scan_projects > "$scan_cache"
+    else
+        scan_projects > "$scan_cache"
+    fi
+    {
+        [ -f "$recent_file" ] && tac "$recent_file" 2>/dev/null
+        cat "$scan_cache"
+    } | grep -v '^$' | awk '!seen[$0]++' | grep -vFx "$HOME"
+}
+
+# ── Draw initial screen ─────────────────────────────────────────────────
+draw_initial() {
+    local -n rlines=$1
+    local total_right="$2"
+    local root_count="$3"
+    local total_rows=$(( 7 > total_right ? 7 : total_right ))
+
+    echo ""  # top margin
+    for ((r = 0; r < total_rows; r++)); do
+        case "$r" in
+            0) left="$P0" ;; 1) left="$P1" ;; 2) left="$P2" ;;
+            3) left="$PC" ;; 4) left="$P4" ;; 5) left="$P5" ;;
+            6) left="$P6" ;;
+            *) local ri=$(( (r - 7) % 4 )); left="${ROOTS[$ri]}" ;;
+        esac
+        if [ "$r" -lt "$total_right" ]; then
+            echo "$(pad_left "$left")  ${rlines[$r]}"
+        else
+            echo "$(pad_left "$left")"
+        fi
+    done
+    echo ""
+    printf '\033[%dG' "$CURSOR_COL"
+}
+
+ROOTS=('          |    ' '          |    ' '         / \   ' '        /   \  ')
+
+# ── Picker ──────────────────────────────────────────────────────────────
+picker() {
+    local projects=("$@")
+
+    if [ ${#projects[@]} -eq 0 ]; then
+        echo ""; echo "$P0"; echo "$P1"; echo "$P2"
+        echo "$PC"; echo "$P4"; echo "$P5"; echo "$P6"
+        echo ""; echo "No projects found. Starting in home directory."
+        sleep 1; cd "$HOME"; exec $PI_CMD
+    fi
+
+    local right_lines=()
+    right_lines+=("Select a project directory:")
+    right_lines+=("   0) Other…  (type a custom path)")
+    right_lines+=("   h) ~")
+    for i in "${!projects[@]}"; do
+        local name=$(basename "${projects[$i]}")
+        local short=$(home_tilde "${projects[$i]}")
+        right_lines+=("$(printf "  %3d) %s  (%s)" $((i+1)) "$name" "$short")")
+    done
+
+    local total_right=${#right_lines[@]}
+    local root_count=$(( total_right > 7 ? total_right - 7 : 0 ))
+    local -a seq=(0 0 0 0  1 1 1 1  0 0 0 0  2 2 2 2  0 0  3 3  0 0)
+    local choice=""
+    local key
+    local frame=0
+    local mid_row=5
+
+    clear
+    draw_initial right_lines "$total_right" "$root_count"
+    printf '\033[s\033[?25l'   # save cursor, hide it
+
+    while true; do
+        local pi=${seq[$((frame % ${#seq[@]}))]}
+        printf '\033[%dH%s' "$mid_row" "$(pad_left "$(petal_mid "$pi")")"
+        printf '\033[u'           # restore cursor
+
+        if read -r -t 0.15 -n 1 key 2>/dev/null; then
+            choice="$key"
+            break
+        fi
+        frame=$((frame + 1))
+    done
+
+    printf '\033[?25h'   # show cursor
+
+    choice="${choice//[[:space:]]/}"
+    local dir=""
+
+    if [ "$choice" = "h" ] || [ "$choice" = "H" ]; then
+        dir="$HOME"
+    elif [ "$choice" = "0" ]; then
+        echo ""; read -r -p "Enter directory path: " dir || exit 1
+        dir="${dir/#\~/$HOME}"; dir="${dir//[[:space:]]/}"
+    elif [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#projects[@]} ]; then
+        dir="${projects[$((choice-1))]}"
+    else
+        dir="$choice"; dir="${dir/#\~/$HOME}"
+    fi
+
+    [ -z "$dir" ] && { echo ""; echo "Invalid choice."; sleep 1; exit 1; }
+    dir=$(realpath -m "$dir" 2>/dev/null || echo "$dir")
+    if [ ! -d "$dir" ]; then
+        echo ""; echo "❌ Directory does not exist: $dir"
+        echo "Press Enter to exit..."; read -r || true; exit 1
+    fi
+
+    {
+        echo "$dir"
+        [ -f "$CACHE_DIR/recent.txt" ] && grep -vFx "$dir" "$CACHE_DIR/recent.txt" 2>/dev/null || true
+    } > "$CACHE_DIR/recent.txt.tmp" && mv "$CACHE_DIR/recent.txt.tmp" "$CACHE_DIR/recent.txt"
+
+    echo ""; echo "🚀 Launching pi in: $dir"; sleep 0.5
+    cd "$dir"; exec $PI_CMD
+}
+
+main() {
+    mapfile -t projects < <(build_menu)
+    picker "${projects[@]}"
+}
+main
