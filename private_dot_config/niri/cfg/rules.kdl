@@ -1,0 +1,45 @@
+    // ────────────── Window Rules ──────────────
+
+    // Round corners, blur & opacity on all windows
+    window-rule {
+        geometry-corner-radius 20
+        clip-to-geometry true
+        opacity 0.95
+
+        background-effect {
+            blur true
+        }
+    }
+
+    // Inactive windows: slightly more transparent
+    window-rule {
+        match is-active=false
+        opacity 0.90
+    }
+
+    // Steam
+    window-rule {
+        match app-id="steam"
+        exclude title=r#"^[Ss]team$"#
+        open-floating true
+    }
+
+    window-rule {
+        match app-id="steam" title=r#"^notificationtoasts_\d+_desktop$"#
+        default-floating-position x=10 y=10 relative-to="bottom-right"
+        open-focused false
+    }
+
+    // Blur behind Noctalia shell components (bar, panels, dock)
+    layer-rule {
+        match namespace=r#"^noctalia-(background|launcher-overlay|dock)-.*$"#
+        background-effect {
+            blur true
+        }
+    }
+
+    // Place Noctalia wallpaper on the backdrop
+    layer-rule {
+        match namespace=r#"^noctalia-wallpaper.*$"#
+        place-within-backdrop true
+    }

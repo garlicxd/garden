@@ -1,8 +1,0 @@
-#!/bin/bash
-# Rotate screen 270° (portrait left)
-# Usage: rotate_270 [output-name]
-# Default output: eDP-1
-
-OUTPUT="${1:-eDP-1}"
-niri msg output "$OUTPUT" transform "270"
-echo "→ Rotated $OUTPUT to 270° (portrait left)"

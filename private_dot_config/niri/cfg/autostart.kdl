@@ -1,0 +1,10 @@
+// ────────────── Startup Applications ──────────────
+// Noctalia v5 — started directly (no longer via qs noctalia-shell)
+
+// Noctalia v5 — native compositor shell
+spawn-at-startup "noctalia"
+
+// xdg-desktop-portal (needed for Secret portal / gnome-keyring integration)
+spawn-at-startup "start-portal.sh"
+
+

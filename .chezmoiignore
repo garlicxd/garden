@@ -1,12 +1,15 @@
-# Node modules - should be installed via package manager
+# Pi Coding Agent — ignore generated/non-portable artifacts
 .pi/agent/npm/node_modules
-.pi/npm/node_modules
-
-# Sessions contain JWTs and API keys
 .pi/agent/sessions
-
-# Auth file contains API keys
 .pi/agent/auth.json
-
-# Compiled binaries in .pi/agent/bin (platform-specific)
 .pi/agent/bin
+
+# Noctalia — ignore ephemeral state (cache, clipboard, history)
+.local/state/noctalia/clipboard
+.local/state/noctalia/notification_history.json
+.local/state/noctalia/recently_used.json
+.local/state/noctalia/usage_counts.json
+.local/state/noctalia/community-palettes
+.local/state/noctalia/community-templates
+.local/state/noctalia/.setup-complete
+.local/state/noctalia/plugins
