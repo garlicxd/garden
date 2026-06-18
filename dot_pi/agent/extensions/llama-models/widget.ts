@@ -15,7 +15,7 @@ export function renderWidget(
 
   // Active team
   if (activeTeamName) {
-    lines.push(theme.fg("accent", `Team: ${activeTeamName}`));
+    lines.push(theme.fg("accent", "Team: " + activeTeamName));
   }
 
   // Per-model status
@@ -24,9 +24,9 @@ export function renderWidget(
     if (state) {
       const sizeStr = formatSize(config.ggufSizeBytes);
       lines.push(
-        theme.fg("success", `█ `) +
+        theme.fg("success", "█ ") +
           theme.fg("accent", config.name) +
-          theme.fg("dim", `  :${state.port}  ${sizeStr}`),
+          theme.fg("dim", "  :" + state.port + "  " + sizeStr),
       );
     }
   }
@@ -41,19 +41,23 @@ export function renderWidget(
     freeGB > 5 ? theme.fg("warning", freeGB.toFixed(1)) :
     theme.fg("error", freeGB.toFixed(1));
 
-  lines.push(
-    "",
-    theme.fg("dim", `Free: ${freeColored} GB`) +
-      theme.fg("muted", "  |  ") +
-      theme.fg("dim", `Active: ${bytesToGB(activeBytes).toFixed(1)} GB (${servers.size} model${servers.size !== 1 ? "s" : "")}`),
-  );
+  const activeGB = bytesToGB(activeBytes).toFixed(1);
+  const plural = servers.size !== 1 ? "s" : "";
+  const summaryLine =
+    theme.fg("dim", "Free: ") +
+    freeColored +
+    theme.fg("dim", " GB") +
+    theme.fg("muted", "  |  ") +
+    theme.fg("dim", "Active: " + activeGB + " GB (" + servers.size + " model" + plural + ")");
+
+  lines.push("", summaryLine);
 
   // Running models summary (greyed)
   if (servers.size > 0) {
     const names = Array.from(servers.keys())
-      .map((id) => configs.find((c) => c.id === id)?.name ?? id)
+      .map(function (id) { return configs.find(function (c) { return c.id === id; })?.name ?? id; })
       .join(", ");
-    lines.push(theme.fg("muted", `Running: ${names}`));
+    lines.push(theme.fg("muted", "Running: " + names));
   }
 
   // Keybindings hint
@@ -68,6 +72,6 @@ export function renderWidget(
 
 function formatSize(bytes: number): string {
   const gb = bytes / (1024 * 1024 * 1024);
-  if (gb >= 1) return `${gb.toFixed(1)} GB`;
-  return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+  if (gb >= 1) return gb.toFixed(1) + " GB";
+  return (bytes / (1024 * 1024)).toFixed(0) + " MB";
 }
