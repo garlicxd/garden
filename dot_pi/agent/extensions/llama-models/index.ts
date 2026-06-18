@@ -8,13 +8,13 @@ import {
   SettingsList,
   Text,
   Spacer,
+  visibleWidth,
+  truncateToWidth,
 } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import * as path from "node:path";
 import { scanModels } from "./scanner";
-import { getTeamGrayInfo, bytesToGB } from "./memcheck";
+import { getTeamGrayInfo, getAvailableRAM, bytesToGB } from "./memcheck";
 import { startServer, stopServer, killAll, startTeam, formatSize } from "./process";
-import { renderWidget } from "./widget";
 import type { ModelConfig, ServerState, TeamPreset } from "./types";
 import teamsConfig from "./teams.json";
 
@@ -140,15 +140,90 @@ async function switchToMainModel(preset: TeamPreset, ctx: ExtensionContext, pi: 
   pi.sendUserMessage(`/model ${targetFull}`);
 }
 
-// ─── Widget Setup ─────────────────────────────────────────
+// ─── Footer Setup ─────────────────────────────────────────
 
-function setupWidget(pi: ExtensionAPI) {
-  pi.on("session_start", async (_event, ctx) => {
-    ctx.ui.setWidget("llama-models", (_tui, theme) => ({
-      render: () => renderWidget(configs, servers, activeTeam, theme),
-      invalidate: () => {},
-    }));
+let _footerTui: { requestRender: () => void } | null = null;
+
+function runningModelNames(): string[] {
+  return Array.from(servers.keys()).map(function (id) {
+    return configs.find(function (c) { return c.id === id; })?.name ?? id;
   });
+}
+
+function setupFooter(pi: ExtensionAPI) {
+  pi.on("session_start", async (_event, ctx) => {
+    // Defer footer setup — TUI may not be fully initialized during session_start
+    setTimeout(function () {
+      if (ctx.mode !== "tui") return;
+
+      ctx.ui.setFooter(function (tui, theme, footerData) {
+        _footerTui = tui;
+
+      const unsub = footerData.onBranchChange(function () {
+        tui.requestRender();
+      });
+
+      return {
+        dispose: unsub,
+        invalidate: function () {},
+        render: function (width: number): string[] {
+          // ── Line 1: token stats ──
+          var input = 0, output = 0, cache = 0, cost = 0;
+          for (var _i = 0, _a = ctx.sessionManager.getBranch(); _i < _a.length; _i++) {
+            var e = _a[_i];
+            if (e.type === "message" && e.message.role === "assistant") {
+              var m = e.message;
+              input += m.usage?.input ?? 0;
+              output += m.usage?.output ?? 0;
+              cache += m.usage?.cacheRead ?? 0;
+              cost += m.usage?.cost?.total ?? 0;
+            }
+          }
+
+          var gitBranch = footerData.getGitBranch();
+          var fmt = function (n: number) {
+            if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";
+            if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+            if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+            return String(n);
+          };
+
+          var statsLeft = theme.fg("dim", "↑" + fmt(input) + " ↓" + fmt(output) + " R" + fmt(cache) + " $" + cost.toFixed(3));
+          var modelName = ctx.model ? ctx.model.id || ctx.model.name || "" : "no model";
+          var branchStr = gitBranch ? " (" + gitBranch + ")" : "";
+          var statsRight = theme.fg("dim", modelName + branchStr);
+
+          var pad1 = " ".repeat(Math.max(1, width - visibleWidth(statsLeft) - visibleWidth(statsRight)));
+          var line1 = truncateToWidth(statsLeft + pad1 + statsRight, width);
+
+          // ── Line 2: memory & running models ──
+          var availableBytes = getAvailableRAM();
+          var activeBytes = 0;
+          servers.forEach(function (s) { activeBytes += s.ramUsedBytes; });
+          var freeGB = bytesToGB(availableBytes);
+          var activeGB = bytesToGB(activeBytes).toFixed(1);
+          var plural = servers.size !== 1 ? "s" : "";
+          var memLeft = theme.fg("dim", "Free: " + freeGB.toFixed(1) + " GB | Active: " + activeGB + " GB (" + servers.size + " model" + plural + ")");
+
+          var runningRight = "";
+          if (servers.size > 0) {
+            var names = runningModelNames().join(", ");
+            runningRight = theme.fg("muted", names);
+          }
+
+          if (runningRight.length > 0) {
+            var pad2 = " ".repeat(Math.max(1, width - visibleWidth(memLeft) - visibleWidth(runningRight)));
+            var line2 = truncateToWidth(memLeft + pad2 + runningRight, width);
+            return [line1, line2];
+          }
+
+          return [line1];
+        },
+      };
+    }); // setFooter
+
+      }); // setTimeout
+  }); // session_start
 }
 
 // ─── Entry Point ──────────────────────────────────────────
@@ -165,8 +240,8 @@ export default async function (pi: ExtensionAPI) {
   registerProviders(pi);
   console.log("[llama-models] Providers registered for all models");
 
-  // Set up widget
-  setupWidget(pi);
+  // Set up footer
+  setupFooter(pi);
 
   // Restore state on session start
   pi.on("session_start", async (_event, ctx) => {
@@ -193,7 +268,7 @@ export default async function (pi: ExtensionAPI) {
     }
   });
 
-  // Navigate session tree — refresh widget
+  // Navigate session tree — refresh footer
   pi.on("session_tree", async (_event, ctx) => {
     restoreState(ctx);
     persistState(pi);
