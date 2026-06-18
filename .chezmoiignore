@@ -2,6 +2,7 @@
 .pi/agent/npm/node_modules
 .pi/agent/sessions
 .pi/agent/auth.json
+.pi/agent/extensions/auth.json
 .pi/agent/bin
 
 # Noctalia — ignore ephemeral state (cache, clipboard, history)

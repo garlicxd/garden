@@ -1,0 +1,40 @@
+{
+  "presets": [
+    {
+      "id": "audit",
+      "name": "Audit Team",
+      "description": "DeepSeek R1 auditor + Gemma 4 assistant",
+      "members": ["deepseek-r1-32b-qwen-distill-q4_K_M", "gemma4-12b"],
+      "default": true
+    },
+    {
+      "id": "code",
+      "name": "Code Team",
+      "description": "Qwen3.6 35B-A3B orchestrator + Qwen 2.5 Coder",
+      "members": ["Qwen3.6-35B-A3B-bartowski-Q4_K_M", "qwen2.5-coder-1.5b"],
+      "default": false
+    },
+    {
+      "id": "precision",
+      "name": "Precision Engineer",
+      "description": "Qwen3.6 27B solo",
+      "members": ["qwen3.6-27b-q4_K_M"],
+      "default": false
+    },
+    {
+      "id": "deepseek-solo",
+      "name": "Solo: DeepSeek R1",
+      "description": "Just the auditor",
+      "members": ["deepseek-r1-32b-qwen-distill-q4_K_M"],
+      "default": false
+    },
+    {
+      "id": "gemma-solo",
+      "name": "Solo: Gemma 4",
+      "description": "Gemma 4 12B only",
+      "members": ["gemma4-12b"],
+      "default": false
+    }
+  ],
+  "defaultPreset": "audit"
+}
