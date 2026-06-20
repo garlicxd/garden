@@ -49,7 +49,9 @@ export default function (pi: ExtensionAPI) {
    *  the password, false otherwise. */
   async function verifyPassword(): Promise<boolean> {
     try {
-      const cmd = `SUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -A -v`;
+      // Invalidate sudo's timestamp first via -K so a previously cached auth
+      // doesn't make -v succeed without asking our askpass script.
+      const cmd = `SUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -K; SUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -A -v`;
       const result = await pi.exec("bash", ["-c", cmd], {
         timeout: 10_000,
       });
