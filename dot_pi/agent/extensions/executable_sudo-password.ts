@@ -113,7 +113,7 @@ export default function (pi: ExtensionAPI) {
    *  Also skips if SUDO_ASKPASS is already present (prevents double-injection). */
   function hasSudo(command: string): boolean {
     if (/SUDO_ASKPASS/.test(command)) return false;
-    return /(?:^|&&|\|\||[;&|(!])\s*sudo\b(?!\s+-[AvVk]|\s+--askpass)/m.test(command);
+    return /(?:^|&&|\|\||[;&|(!])\s*sudo\b(?=\s|$)(?!\s+-[AvVk]|\s+--askpass)/m.test(command);
   }
 
   /** Replace sudo invocations at shell command boundaries with an askpass-prefixed
@@ -121,7 +121,7 @@ export default function (pi: ExtensionAPI) {
    *  at command boundaries, mirroring hasSudo, to avoid corrupting quoted strings. */
   function injectAskpass(command: string): string {
     return command.replace(
-      /(?:^|&&|\|\||[;&|(!])\s*\bsudo\b(?!\s+-[AvVk]|\s+--askpass)/g,
+      /(?:^|&&|\|\||[;&|(!])\s*\bsudo\b(?=\s|$)(?!\s+-[AvVk]|\s+--askpass)/g,
       (match) =>
         match.slice(0, match.lastIndexOf("sudo")) +
         `SUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -A`,
