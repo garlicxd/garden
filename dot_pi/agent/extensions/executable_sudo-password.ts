@@ -3,23 +3,21 @@
  *
  * Caches the user's sudo password in memory (never on disk in plain sight),
  * automatically feeds it to sudo commands via SUDO_ASKPASS, keeps the
- * password hidden from the LLM/provider, and detects/re-prompts on wrong
- * passwords.
+ * password hidden from the LLM/provider, and re-prompts on wrong passwords.
  *
  * Commands:
- *   /sudo           - prompt to set password
+ *   /sudo           - prompt to set password (retries up to 3 times on wrong pw)
  *   /sudo <pw>      - set password directly (warning: visible in pi history)
  *   /sudo clear     - clear cached password
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { isBashToolResult } from "@earendil-works/pi-coding-agent";
-import { writeFile, unlink, readdir } from "node:fs/promises";
+import { writeFile, unlink, readdir, access } from "node:fs/promises";
 
 export default function (pi: ExtensionAPI) {
   // --- State ---
-  let cachedPassword: string | null = null;       // verified-good password (promoted after success)
-  let pendingPassword: string | null = null;      // password for current execution, not yet verified
+  let cachedPassword: string | null = null;       // verified-good password
   /** Track which toolCallIds originated from sudo commands.
    *  Set-based so parallel tool execution is handled correctly. */
   const sudoCallIds = new Set<string>();
@@ -45,27 +43,73 @@ export default function (pi: ExtensionAPI) {
     cachedPassword = password;
   }
 
-  /** Prompt the user for their sudo password. Returns null if cancelled / no UI. */
-  async function promptForPassword(ctx: {
-    hasUI: boolean;
-    ui: { input: (title: string, placeholder: string) => Promise<string | undefined> };
-  }): Promise<string | null> {
+  /** Run sudo -A -v to verify the password in PASS_FILE is correct.
+   *  Returns true if sudo accepted the password, false otherwise. */
+  async function verifyPassword(): Promise<boolean> {
+    try {
+      const result = await pi.exec("sudo", ["-A", "-v"], {
+        env: { SUDO_ASKPASS: ASKPASS_SCRIPT },
+        timeout: 10_000,
+      });
+      return result.code === 0;
+    } catch {
+      // If verification itself fails (e.g. sudo not available), assume
+      // password is valid rather than blocking the user's command.
+      return true;
+    }
+  }
+
+  /** Prompt for password, verify via sudo -A -v, and retry up to maxAttempts.
+   *  Returns the verified password, or null if cancelled / max attempts exhausted. */
+  async function promptAndVerify(
+    ctx: {
+      hasUI: boolean;
+      ui: { input: (title: string, placeholder: string) => Promise<string | undefined>; notify: (msg: string, level: "info" | "warning" | "error") => void };
+    },
+    maxAttempts: number = 3,
+  ): Promise<string | null> {
     if (!ctx.hasUI) return null;
-    const pw = await ctx.ui.input(
-      "Enter sudo password (stored in memory only for this session):",
-      "",
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const title = attempt === 1
+        ? "Enter sudo password (stored in memory only for this session):"
+        : "Wrong password. Try again:";
+      const pw = await ctx.ui.input(title, "");
+      if (!pw || pw.length === 0) return null; // cancelled
+
+      await writePasswordFiles(pw);
+      const verified = await verifyPassword();
+      if (verified) return pw;
+
+      // Wrong password — clean up files for the next attempt
+      await unlink(PASS_FILE).catch(() => {});
+      await unlink(ASKPASS_SCRIPT).catch(() => {});
+
+      if (attempt < maxAttempts) {
+        ctx.ui.notify(
+          `Wrong sudo password — attempt ${attempt}/${maxAttempts}.`,
+          "error",
+        );
+      }
+    }
+
+    ctx.ui.notify(
+      `Wrong sudo password — ${maxAttempts} attempts exhausted.`,
+      "error",
     );
-    return pw && pw.length > 0 ? pw : null;
+    return null;
   }
 
   /** Check whether a bash command string contains a sudo invocation
    *  that we should intercept.  Skips commands that already use -A / --askpass
-   *  (already handled), or -v (validate/refresh), or -k (invalidate).
+   *  (already handled), or -v (validate/refresh), or -k (invalidate),
+   *  or -V (version — does not require auth).
    *  Also skips if SUDO_ASKPASS is already present (prevents double-injection). */
   function hasSudo(command: string): boolean {
     if (/SUDO_ASKPASS/.test(command)) return false;
     // Must be followed by whitespace or end-of-string (not hyphen/underscore like sudo-password)
-    return /\bsudo\b(?=\s|$)(?!\s+-[Avk]|\s+--askpass)/.test(command);
+    // Exclude sudo -V (version, no auth), -v (validate), -k (invalidate), -A (askpass).
+    return /\bsudo\b(?=\s|$)(?!\s+-[AvVk]|\s+--askpass)/.test(command);
   }
 
   /** Replace all `sudo` tokens with an askpass-prefixed `sudo -A` (handles compound commands). */
@@ -100,7 +144,6 @@ export default function (pi: ExtensionAPI) {
     await unlink(PASS_FILE).catch(() => {});
     await unlink(ASKPASS_SCRIPT).catch(() => {});
     cachedPassword = null;
-    pendingPassword = null;
   }
 
   // --- Session lifecycle ---
@@ -159,35 +202,67 @@ export default function (pi: ExtensionAPI) {
         sudoCallIds.add(event.toolCallId);
 
         if (!cachedPassword) {
-          // No verified password yet — try pending, or prompt fresh
-          if (!pendingPassword) {
-            const pw = await promptForPassword(ctx);
-            if (!pw) {
-              return {
-                block: true,
-                reason: "No sudo password provided (required for sudo commands)",
-              };
-            }
-            await writePasswordFiles(pw);
-            pendingPassword = pw;
-            ctx.ui.notify("Sudo password prompted — will cache once verified.", "info");
-          } else {
-            // Pending password exists but previous command's result hasn't
-            // come back yet (or files were cleaned). Re-ensure files.
-            try {
-              const { access } = await import("node:fs/promises");
-              await access(PASS_FILE);
-            } catch {
-              await writePasswordFiles(pendingPassword);
-            }
+          // No verified password — prompt and verify with retry loop.
+          const pw = await promptAndVerify(ctx, 3);
+          if (!pw) {
+            return {
+              block: true,
+              reason:
+                "No valid sudo password provided (required for sudo commands). Use /sudo to set one.",
+            };
           }
+          cachedPassword = pw;
+          ctx.ui.notify(
+            "Sudo password verified \u2713 \u2014 cached for this session.",
+            "info",
+          );
         } else {
-          // Verified password cached — ensure files exist
+          // Verified password cached — ensure files exist, then re-verify.
+          // Always re-verify so stale/expired passwords are caught early
+          // rather than relying on output heuristics in tool_result.
+          let filesOk = true;
           try {
-            const { access } = await import("node:fs/promises");
             await access(PASS_FILE);
+            await access(ASKPASS_SCRIPT);
           } catch {
             await writePasswordFiles(cachedPassword);
+            filesOk = false; // Files were missing — force re-verify
+          }
+
+          if (filesOk) {
+            // Files exist — re-verify in case the password changed externally
+            const verified = await verifyPassword();
+            if (!verified) {
+              // Cached password is no longer valid — prompt for a new one
+              await cleanup();
+              ctx.ui.notify(
+                "Cached sudo password expired or incorrect — re-prompting.",
+                "warning",
+              );
+              const pw = await promptAndVerify(ctx, 3);
+              if (!pw) {
+                return {
+                  block: true,
+                  reason:
+                    "No valid sudo password provided. Cached password was invalid; use /sudo to reset.",
+                };
+              }
+              cachedPassword = pw;
+              ctx.ui.notify(
+                "Sudo password verified \u2713 \u2014 cached for this session.",
+                "info",
+              );
+            }
+          } else {
+            // Files were missing — re-verify after regenerating
+            const verified = await verifyPassword();
+            if (!verified) {
+              await cleanup();
+              ctx.ui.notify(
+                "Cached sudo password is no longer valid \u2014 will re-prompt on next sudo.",
+                "error",
+              );
+            }
           }
         }
 
@@ -221,38 +296,31 @@ export default function (pi: ExtensionAPI) {
 
     const status = getSudoStatus(allText, event.isError);
 
-    let wasFreshPrompt = false;
-    if (status === "success") {
-      // Promote pending password to verified cache
-      if (pendingPassword) {
-        cachedPassword = pendingPassword;
-        pendingPassword = null;
-        wasFreshPrompt = true;
-        ctx.ui.notify("Sudo password verified ✓ — cached for this session.", "info");
-      }
-    } else if (status === "wrong-password") {
+    // Password is verified synchronously in tool_call via sudo -A -v,
+    // so wrong-password here means something went wrong (e.g. askpass
+    // race, permissions). Clear cache and notify.
+    if (status === "wrong-password") {
+      await cleanup();
       ctx.ui.notify(
-        "Wrong sudo password — not cached. Will re-prompt on next sudo.",
+        "Wrong sudo password — cache cleared. Use /sudo to retry, or run another sudo command to re-prompt.",
         "error",
       );
-      await cleanup();
     }
 
     // Inject status block into content so the LLM knows the outcome.
-    // Clear messaging: tells the agent whether password was accepted, rejected,
-    // or if the command itself failed despite accepted password.
-    const successMsg = wasFreshPrompt
-      ? "[sudo] Password verified ✓ — now cached for this session."
-      : "[sudo] Password accepted (cached).";
     const statusMessages: Record<string, string> = {
-      "success": successMsg,
-      "wrong-password": "[sudo] Wrong password ✗ — NOT cached. Re-prompt (/sudo) before retrying sudo.",
-      "failed": "[sudo] Password accepted but command failed (non-password error — check stderr above).",
+      "success": "[sudo] Password accepted (cached).",
+      "wrong-password":
+        "[sudo] Wrong password \u2717 \u2014 cache cleared. The user must re-enter their password (/sudo or run a sudo command to prompt).",
+      "failed":
+        "[sudo] Password accepted but command failed (non-password error \u2014 check stderr above).",
     };
     newContent.push({ type: "text", text: statusMessages[status] });
 
     // Cache-state line so the agent knows whether next sudo will auto-inject
-    const cacheState = cachedPassword ? "active (next sudo will auto-inject)" : "empty (next sudo will prompt)";
+    const cacheState = cachedPassword
+      ? "active (next sudo will auto-inject)"
+      : "empty (next sudo will prompt)";
     newContent.push({ type: "text", text: `[sudo] Cache: ${cacheState}` });
 
     return { content: newContent };
@@ -302,22 +370,34 @@ export default function (pi: ExtensionAPI) {
       }
 
       if (args) {
-        await storePassword(args);
+        // Verify before caching
+        await writePasswordFiles(args);
+        const verified = await verifyPassword();
+        if (!verified) {
+          await cleanup();
+          ctx.ui.notify(
+            "Wrong sudo password — not cached. Try /sudo (no args) for interactive retry.",
+            "error",
+          );
+          return;
+        }
+        cachedPassword = args;
         ctx.ui.notify("Sudo password cached for this session.", "info");
         return;
       }
 
       if (cachedPassword) {
-        ctx.ui.notify("Sudo password is already cached ✓  Use /sudo clear to remove.", "info");
+        ctx.ui.notify(
+          "Sudo password is already cached \u2713  Use /sudo clear to remove.",
+          "info",
+        );
         return;
       }
 
-      const pw = await ctx.ui.input(
-        "Enter sudo password (stored in memory only for this session):",
-        "",
-      );
+      // Interactive — prompt and verify with retry loop
+      const pw = await promptAndVerify(ctx, 3);
       if (pw) {
-        await storePassword(pw);
+        cachedPassword = pw;
         ctx.ui.notify("Sudo password cached for this session.", "info");
       } else {
         ctx.ui.notify("Password not set.", "warning");
