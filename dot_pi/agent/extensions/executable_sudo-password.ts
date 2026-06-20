@@ -105,22 +105,26 @@ export default function (pi: ExtensionAPI) {
   }
 
   /** Check whether a bash command string contains a sudo invocation
-   *  that we should intercept.  Skips commands that already use -A / --askpass
-   *  (already handled), or -v (validate/refresh), or -k (invalidate),
-   *  or -V (version — does not require auth).
+   *  that we should intercept.  Only matches sudo at shell command boundaries
+   *  (start of string, after &&, ||, ;, &, |, (, !, or newline) to avoid
+   *  false positives inside quoted strings (e.g. git commit -m "sudo...").
+   *  Skips commands that already use -A / --askpass (already handled),
+   *  or -v (validate/refresh), or -k (invalidate), or -V (version).
    *  Also skips if SUDO_ASKPASS is already present (prevents double-injection). */
   function hasSudo(command: string): boolean {
     if (/SUDO_ASKPASS/.test(command)) return false;
-    // Must be followed by whitespace or end-of-string (not hyphen/underscore like sudo-password)
-    // Exclude sudo -V (version, no auth), -v (validate), -k (invalidate), -A (askpass).
-    return /\bsudo\b(?=\s|$)(?!\s+-[AvVk]|\s+--askpass)/.test(command);
+    return /(?:^|&&|\|\||[;&|(!])\s*sudo\b(?!\s+-[AvVk]|\s+--askpass)/m.test(command);
   }
 
-  /** Replace all `sudo` tokens with an askpass-prefixed `sudo -A` (handles compound commands). */
+  /** Replace sudo invocations at shell command boundaries with an askpass-prefixed
+   *  `sudo -A` (handles compound commands). Only replaces sudo that appears
+   *  at command boundaries, mirroring hasSudo, to avoid corrupting quoted strings. */
   function injectAskpass(command: string): string {
     return command.replace(
-      /\bsudo\b/g,
-      `SUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -A`,
+      /(?:^|&&|\|\||[;&|(!])\s*\bsudo\b(?!\s+-[AvVk]|\s+--askpass)/g,
+      (match) =>
+        match.slice(0, match.lastIndexOf("sudo")) +
+        `SUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -A`,
     );
   }
 
