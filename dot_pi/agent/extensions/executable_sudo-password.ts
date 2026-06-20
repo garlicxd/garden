@@ -44,15 +44,16 @@ export default function (pi: ExtensionAPI) {
   }
 
   /** Run sudo -A -v to verify the password in PASS_FILE is correct.
-   *  Uses bash -c for Unix env-var prefix instead of pi.exec's env option
-   *  (which is not supported by ExecOptions). Returns true if sudo accepted
-   *  the password, false otherwise. */
+   *  Sets SUDO_ASKPASS via process.env since pi.exec's ExecOptions
+   *  does not support an env field.  Runs `sudo -K` first to invalidate
+   *  sudo's timestamp cache so we always test the actual password.
+   *  Returns true if sudo accepted the password, false otherwise. */
   async function verifyPassword(): Promise<boolean> {
+    const prev = process.env.SUDO_ASKPASS;
+    process.env.SUDO_ASKPASS = ASKPASS_SCRIPT;
     try {
-      // Invalidate sudo's timestamp first via -K so a previously cached auth
-      // doesn't make -v succeed without asking our askpass script.
-      const cmd = `SUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -K; SUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -A -v`;
-      const result = await pi.exec("bash", ["-c", cmd], {
+      await pi.exec("sudo", ["-K"], { timeout: 5_000 });
+      const result = await pi.exec("sudo", ["-A", "-v"], {
         timeout: 10_000,
       });
       return result.code === 0;
@@ -60,6 +61,12 @@ export default function (pi: ExtensionAPI) {
       // If verification itself fails (e.g. sudo not available), assume
       // password is valid rather than blocking the user's command.
       return true;
+    } finally {
+      if (prev !== undefined) {
+        process.env.SUDO_ASKPASS = prev;
+      } else {
+        delete process.env.SUDO_ASKPASS;
+      }
     }
   }
 
@@ -77,7 +84,7 @@ export default function (pi: ExtensionAPI) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const title = attempt === 1
         ? "Enter sudo password (stored in memory only for this session):"
-        : "Wrong password. Try again:";
+        : `Wrong password. Try again (${attempt}/${maxAttempts}):`;
       const pw = await ctx.ui.input(title, "");
       if (!pw || pw.length === 0) return null; // cancelled
 
@@ -88,13 +95,6 @@ export default function (pi: ExtensionAPI) {
       // Wrong password — clean up files for the next attempt
       await unlink(PASS_FILE).catch(() => {});
       await unlink(ASKPASS_SCRIPT).catch(() => {});
-
-      if (attempt < maxAttempts) {
-        ctx.ui.notify(
-          `Wrong sudo password — attempt ${attempt}/${maxAttempts}.`,
-          "error",
-        );
-      }
     }
 
     ctx.ui.notify(
