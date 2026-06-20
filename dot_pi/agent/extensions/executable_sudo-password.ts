@@ -44,11 +44,13 @@ export default function (pi: ExtensionAPI) {
   }
 
   /** Run sudo -A -v to verify the password in PASS_FILE is correct.
-   *  Returns true if sudo accepted the password, false otherwise. */
+   *  Uses bash -c for Unix env-var prefix instead of pi.exec's env option
+   *  (which is not supported by ExecOptions). Returns true if sudo accepted
+   *  the password, false otherwise. */
   async function verifyPassword(): Promise<boolean> {
     try {
-      const result = await pi.exec("sudo", ["-A", "-v"], {
-        env: { SUDO_ASKPASS: ASKPASS_SCRIPT },
+      const cmd = `SUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -A -v`;
+      const result = await pi.exec("bash", ["-c", cmd], {
         timeout: 10_000,
       });
       return result.code === 0;
