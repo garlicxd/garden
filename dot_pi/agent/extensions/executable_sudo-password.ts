@@ -54,7 +54,7 @@ export default function (pi: ExtensionAPI) {
     try {
       await writeFile(
         verifyScript,
-        `#!/bin/sh\nSUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -K\nexec sudo -A -v\n`,
+        `#!/bin/sh\nexport SUDO_ASKPASS='${ASKPASS_SCRIPT}'\nsudo -K\nexec sudo -A -v\n`,
         { mode: 0o700 },
       );
       try {
