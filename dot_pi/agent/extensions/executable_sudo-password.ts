@@ -44,29 +44,29 @@ export default function (pi: ExtensionAPI) {
   }
 
   /** Run sudo -A -v to verify the password in PASS_FILE is correct.
-   *  Sets SUDO_ASKPASS via process.env since pi.exec's ExecOptions
-   *  does not support an env field.  Runs `sudo -K` first to invalidate
-   *  sudo's timestamp cache so we always test the actual password.
-   *  Returns true if sudo accepted the password, false otherwise. */
+   *  Writes a throwaway shell script that handles the askpass env locally
+   *  (no process.env reliance, no bash -c quoting) then runs it.
+   *  The script invalidates sudo's timestamp cache first via -K so we
+   *  always test the actual password.  Returns true if sudo accepted
+   *  the password, false otherwise. */
   async function verifyPassword(): Promise<boolean> {
-    const prev = process.env.SUDO_ASKPASS;
-    process.env.SUDO_ASKPASS = ASKPASS_SCRIPT;
+    const verifyScript = `/tmp/.pi-sudo-verify-${pid}.sh`;
     try {
-      await pi.exec("sudo", ["-K"], { timeout: 5_000 });
-      const result = await pi.exec("sudo", ["-A", "-v"], {
-        timeout: 10_000,
-      });
-      return result.code === 0;
+      await writeFile(
+        verifyScript,
+        `#!/bin/sh\nSUDO_ASKPASS='${ASKPASS_SCRIPT}' sudo -K\nexec sudo -A -v\n`,
+        { mode: 0o700 },
+      );
+      try {
+        const result = await pi.exec(verifyScript, [], { timeout: 15_000 });
+        return result.code === 0;
+      } finally {
+        await unlink(verifyScript).catch(() => {});
+      }
     } catch {
       // If verification itself fails (e.g. sudo not available), assume
       // password is valid rather than blocking the user's command.
       return true;
-    } finally {
-      if (prev !== undefined) {
-        process.env.SUDO_ASKPASS = prev;
-      } else {
-        delete process.env.SUDO_ASKPASS;
-      }
     }
   }
 
