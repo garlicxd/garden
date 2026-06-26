@@ -1,0 +1,15 @@
+#
+# ~/.bash_profile
+#
+
+[[ -f ~/.bashrc ]] && . ~/.bashrc
+
+# gnome-keyring (PAM-unlocked) — secrets/passwords
+[ -S "${XDG_RUNTIME_DIR}/keyring/control" ] && \
+    export GNOME_KEYRING_CONTROL="${XDG_RUNTIME_DIR}/keyring/control"
+
+# gcr-ssh-agent (gnome-keyring backed, replaces old in-daemon SSH component since v46)
+[ -S "${XDG_RUNTIME_DIR}/gcr/ssh" ] && \
+    export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR}/gcr/ssh"
+
+. "$HOME/.local/bin/env"
