@@ -224,30 +224,11 @@ blur {
 // which may be more convenient to use.
 // See the binds section below for more spawn examples.
 
-// This line starts waybar, a commonly used bar for Wayland compositors.
-// Touchscreen gestures via lisgd (edge swipes + 3-finger swipes)
-spawn-at-startup "touch-gestures"
-
+// Noctalia v5 — native compositor shell
 spawn-at-startup "noctalia"
 
-// Start xdg-desktop-portal (needed for Secret portal / gnome-keyring integration)
-// Started directly because noctalia doesn't use systemd session management
-spawn-at-startup "start-portal.sh"
-
-// Apply font size from MY_FONT_SIZE environment variable
-spawn-at-startup "apply-font-size"
-
-// rot8 — automatic screen rotation daemon
-// Uses the BMI260 accelerometer now supported via the bmi270 kernel module
-// --normalization-factor 4000 matches the BMI260's raw value range
-// --invert-xy yx --invert-z corrects the ACPI mounting matrix
-spawn-at-startup "rot8" "--normalization-factor" "4000" "--invert-xy" "yx" "--invert-z" "--hooks" "/home/garlic/.config/rot8/hooks.sh"
-
-// For testing, uncomment this instead (oneshot mode — rotates once and exits):
-// spawn-at-startup "rot8" "--oneshot"
-
-// To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
-// spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
+// Export env to systemd/dbus so portal services can connect to Wayland
+spawn-at-startup "sh" "-c" "dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP"
 
 hotkey-overlay {
     // Uncomment this line to disable the "Important Hotkeys" pop-up at startup.

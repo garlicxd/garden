@@ -17,20 +17,8 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 # Local scripts (niri helpers, pi launcher)
 export PATH="$HOME/.local/bin:$HOME/.local/bin/pi:$PATH"
 
-# Ollama Vulkan — Intel Arc B390i (Panther Lake)
-export OLLAMA_IGPU_ENABLE=1
-export OLLAMA_VULKAN=1
-export OLLAMA_FLASH_ATTENTION=1
-export OLLAMA_KEEP_ALIVE=12h
-
-export OLLAMA_MAX_LOADED_MODELS=2
-
 # Brave browser path for Puppeteer-based tools (marp, etc.)
 export CHROME_PATH="/opt/brave-origin-bin/brave"
 
-# Intel oneAPI SYCL environment (only init if not already set)
-if [ -z "$ONEAPI_ROOT" ]; then
-    source /opt/intel/oneapi/setvars.sh --force >/dev/null 2>&1
-fi
 
 . "$HOME/.local/bin/env"
