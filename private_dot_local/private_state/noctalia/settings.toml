@@ -51,8 +51,13 @@ widget_order = [ "lockscreen-login-box@eDP-1" ]
         input_radius = 6.0
         show_login_button = true
 
+[plugins]
+enabled = [ "noctalia/screen_recorder" ]
+
 [shell]
 app_icon_colorize = true
+password_style = "random"
+polkit_agent = true
 settings_show_advanced = true
 ui_scale = 1.5000000149011612
 
@@ -63,22 +68,26 @@ ui_scale = 1.5000000149011612
     enabled = true
 
 [theme]
-community_palette = "Cream"
-source = "community"
-wallpaper_scheme = "m3-tonal-spot"
+builtin = "Rosé Pine"
+community_palette = "Hexa34C"
+mode = "light"
+wallpaper_scheme = "m3-monochrome"
 
     [theme.templates]
-    builtin_ids = [ "gtk3", "gtk4", "kitty", "kcolorscheme", "niri", "qt" ]
+    builtin_ids = [ "gtk3", "gtk4", "kcolorscheme", "kitty", "niri", "qt", "starship" ]
     community_ids = [ "pi-agent", "obsidian", "zed", "discord" ]
 
-[wallpaper.default]
-path = "/home/garlic/Pictures/Wallpapers/thought-cabinet.jpeg"
+[wallpaper]
+directory = "/home/garlic/Pictures/Wallpapers"
 
-[wallpaper.last]
-path = "/home/garlic/Pictures/Wallpapers/thought-cabinet.jpeg"
+    [wallpaper.default]
+    path = "/home/garlic/Pictures/Wallpapers/thought_cabinet.jpeg"
 
-[wallpaper.monitors.eDP-1]
-path = "/home/garlic/Pictures/Wallpapers/thought-cabinet.jpeg"
+    [wallpaper.last]
+    path = "/home/garlic/Pictures/Wallpapers/thought_cabinet.jpeg"
+
+    [wallpaper.monitors.eDP-1]
+    path = "/home/garlic/Pictures/Wallpapers/thought_cabinet.jpeg"
 
 [widget.battery]
 display_mode = "graphic"

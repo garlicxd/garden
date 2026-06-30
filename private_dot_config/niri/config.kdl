@@ -314,6 +314,12 @@ window-rule {
     opacity 0.90
 }
 
+// Brave Origin: slow down scrolling to match other apps.
+window-rule {
+    match app-id=r#"^brave-origin$"#
+    scroll-factor 0.15
+}
+
 // Blur behind Noctalia shell components (bar, panels, dock).
 layer-rule {
     match namespace=r#"^noctalia-(background|launcher-overlay|dock)-.*$"#

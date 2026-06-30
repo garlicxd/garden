@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.79.6",
+  "lastChangelogVersion": "0.80.2",
   "theme": "noctalia",
   "defaultProvider": "deepseek",
   "defaultModel": "deepseek-v4-flash",
@@ -9,7 +9,8 @@
     "bun"
   ],
   "shellCommandPrefix": "export PATH=\"$HOME/.bun/bin:$PATH\"; alias node=bun; alias npm=bun; alias npx=bunx; alias pnpm=bun; alias yarn=bun; ",
-  "packages": [
-    "npm:@juicesharp/rpiv-web-tools"
-  ]
+  "packages": [],
+  "compaction": {
+    "enabled": true
+  }
 }
