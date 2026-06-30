@@ -67,7 +67,7 @@ echo ".config/some-app/cache" >> ~/.local/share/chezmoi/.chezmoiignore
 rm ~/.local/share/chezmoi/dot_config/some-app/cache
 
 # 3. Commit
-cd ~/.local/share/chezmoi && git add -A && git commit -m "..." && git push
+chezmoi git add . && chezmoi git -- commit -m "..." && chezmoi git -- push
 ```
 
 ## Source Path Conventions
@@ -95,6 +95,9 @@ chezmoi apply
 # Add a new folder
 chezmoi add ~/.config/some-app
 
+# Re-add all modified tracked files (sync machine state to repo)
+chezmoi re-add
+
 # See what chezmoi manages
 chezmoi managed --include=files | sort
 
@@ -109,12 +112,37 @@ chezmoi unmanage ~/.config/some-app/settings.toml
 
 ```bash
 # After adding/changing files with chezmoi add
-chezmoi git add -A
-chezmoi git commit -m "Add/update <description>"
-chezmoi git push
+chezmoi git add .
+chezmoi git -- commit -m "Add/update <description>"
+chezmoi git -- push
 ```
 
-**Don't** `cd` into the source dir and use raw `git` — use `chezmoi git` instead to keep the state database in sync.
+**Don't** `cd` into the source dir and use raw `git` — use `chezmoi git` instead to keep the state database in sync. 
+
+**Important:** `chezmoi git` needs `--` before any git flags (e.g., `-m`). Without `--`, chezmoi tries to parse them as its own flags.
+
+## Sync Machine State (re-add → commit → push)
+
+When the local machine has drifted from the repo (e.g., you changed configs and want to capture the current state), use `chezmoi re-add` instead of `chezmoi add`:
+
+```bash
+# 1. Re-add all modified tracked files to match current state
+chezmoi re-add
+
+# 2. Add any new untracked files
+chezmoi add ~/.config/some-app     # whole dirs, not individual files
+
+# 3. Verify
+chezmoi status        # should be clean
+chezmoi diff          # optional, double-check
+
+# 4. Commit & push
+chezmoi git add .
+chezmoi git -- commit -m "Sync machine state: <description>"
+chezmoi git -- push
+```
+
+`chezmoi re-add` with no args updates all modified managed files at once — it's the fastest way to sync the repo to the current machine.
 
 ## Setup on a New Machine
 
