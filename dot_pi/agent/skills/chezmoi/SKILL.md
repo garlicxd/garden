@@ -172,3 +172,5 @@ chezmoi update
 - **Don't manually edit files inside `~/.local/share/chezmoi/`** — use `chezmoi add` to add, `chezmoi unmanage` to remove, and let chezmoi handle the naming.
 - **After `chezmoi add`**, always verify with `chezmoi status` or `chezmoi diff` before committing.
 - **Ignored files still show up in `chezmoi add` output** — they just say "warning: ignoring" and aren't copied to the source dir.
+- **Edit tool edits the destination, not the source** — when using pi's `edit` tool (or any editor) on a managed file, you're modifying `~/dot_config/...`, not `~/.local/share/chezmoi/dot_config/...`. After editing, run `chezmoi re-add ~/.config/path/to/file` to sync the source before committing.
+- **`chezmoi re-add` is a snapshot** — it only picks up files modified *at the moment you run it*. If you edit more files afterward, run `chezmoi re-add` again (or for individual files) before committing.
