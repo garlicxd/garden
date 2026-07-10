@@ -5,6 +5,7 @@
 .pi/agent/extensions/auth.json
 .pi/agent/bin
 
+
 # Noctalia — ignore ephemeral state (cache, clipboard, history)
 .local/state/noctalia/clipboard
 .local/state/noctalia/notification_history.json
