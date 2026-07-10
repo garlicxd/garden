@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""pkgsearch — unified repo + AUR search. LLM-first JSON output (default) or human table (-p)."""
+import argparse, json, subprocess, sys
+from concurrent.futures import ThreadPoolExecutor
+
+SCHEMA_DOC = """<output_schema>
+ROOT: Array of result objects sorted by source priority (repo alpha then AUR pop desc).
+[
+  {
+    "s": "extra",       // source: repository name or "AUR"
+    "n": "firefox",     // package name
+    "v": "152.0.5-1",   // version
+    "d": "Fast browser",// description
+    "i": false,         // installed
+    "dl": 85778857,     // download size bytes
+    "sz": 300353028,    // installed size bytes
+    "au": null          // null for repo; {"vt":322,"pp":0.839,"od":false,"m":"dudemanguy"} for AUR
+  }
+]
+</output_schema>"""
+
+
+def run(cmd, timeout=30):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.stdout, r.stderr, r.returncode
+    except FileNotFoundError:
+        return "", f"command not found: {cmd[0]}", -1
+    except subprocess.TimeoutExpired:
+        return "", f"timeout after {timeout}s", -1
+
+
+def parse_json_strip(raw):
+    """Find first JSON array/object in raw text. Empty = empty list."""
+    if not raw or not raw.strip():
+        return [], None
+    for start in ('[', '{'):
+        idx = raw.find(start)
+        if idx >= 0:
+            try:
+                return json.loads(raw[idx:]), None
+            except json.JSONDecodeError as e:
+                return None, str(e)
+    return None, "no JSON structure found"
+
+
+def _trunc_desc(s, n=120):
+    """Truncate at word boundary."""
+    if len(s) <= n:
+        return s
+    cut = s.rfind(" ", 0, n - 1)
+    return s[:cut] + "..." if cut > n // 2 else s[:n] + "..."
+
+
+def fetch_repo(query, take):
+    """Search repos. Returns (results, error)."""
+    out, err, code = run(["shelly", "query", "-a", query, "-j"])
+    if code != 0:
+        return [], (err if code == -1 else (err or f"exit code {code}"))
+    data, parse_err = parse_json_strip(out)
+    if data is None:
+        return [], parse_err
+    if isinstance(data, list) and len(data) == 0:
+        return [], None
+    results = []
+    for p in data[:take]:
+        results.append({
+            "s": p.get("Repository", "?"),
+            "n": p["Name"],
+            "v": p.get("Version", "?"),
+            "d": _trunc_desc(p.get("Description") or ""),
+            "i": False,
+            "dl": p.get("DownloadSize", 0) or 0,
+            "sz": p.get("InstalledSize", 0) or 0,
+            "au": None,
+        })
+    return results, None
+
+
+def fetch_aur(query, take, min_popularity=0.0):
+    """Search AUR. Returns (results, error)."""
+    out, err, code = run(["shelly", "aur", "search", "-j", query])
+    if code != 0:
+        return [], (err if code == -1 else (err or f"exit code {code}"))
+    data, parse_err = parse_json_strip(out)
+    if data is None:
+        return [], parse_err
+    if isinstance(data, list) and len(data) == 0:
+        return [], None
+    results = []
+    for p in data:
+        if len(results) >= take:
+            break
+        pop = p.get("Popularity", 0) or 0
+        if pop < min_popularity:
+            continue
+        results.append({
+            "s": "AUR",
+            "n": p["Name"],
+            "v": p.get("Version", "?"),
+            "d": _trunc_desc(p.get("Description") or ""),
+            "i": False,
+            "dl": 0,
+            "sz": 0,
+            "au": {
+                "vt": p.get("NumVotes", 0) or 0,
+                "pp": round(pop, 4),
+                "od": p.get("OutOfDate") is not None,
+                "m": p.get("Maintainer") or "",
+            },
+        })
+    return results, None
+
+
+def fetch_installed():
+    """Return a set of installed package names."""
+    out, err, code = run(["shelly", "query", "-i", "-j"])
+    if code != 0:
+        return set()
+    data, parse_err = parse_json_strip(out)
+    if data is None:
+        return set()
+    return {p["Name"] for p in data if "Name" in p}
+
+
+def format_bytes(b):
+    if not b:
+        return ""
+    for unit in ("B", "KB", "MB", "GB"):
+        if b < 1000:
+            return f"{b:.0f}{unit}"
+        b /= 1000
+    return f"{b:.1f}TB"
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="Search repos + AUR for a package. LLM-friendly JSON by default.",
+        epilog=SCHEMA_DOC,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ap.add_argument("query", nargs="?", default="", help="search term (required)")
+    ap.add_argument("-p", "--plain", action="store_true", help="human-readable table (default: JSON)")
+    ap.add_argument("-n", "--take", type=int, default=30, help="max results per source (default: 30)")
+    ap.add_argument("-r", "--repo-only", action="store_true", help="skip AUR search")
+    ap.add_argument("-a", "--aur-only", action="store_true", help="skip repo search")
+    ap.add_argument("-i", "--installed", action="store_true", help="show only installed packages")
+    ap.add_argument("--min-popularity", type=float, default=0.0, help="AUR min popularity filter")
+    args = ap.parse_args()
+
+    if not args.query:
+        print(json.dumps({"errors": {"fatal": "no query provided"}}))
+        sys.exit(1)
+
+    errors = {}
+    repo_results, aur_results = [], []
+    installed_set = set()
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = {}
+        if not args.aur_only:
+            futures["repo"] = pool.submit(fetch_repo, args.query, args.take)
+        if not args.repo_only:
+            futures["aur"] = pool.submit(fetch_aur, args.query, args.take, args.min_popularity)
+        if args.installed or not args.aur_only:
+            futures["inst"] = pool.submit(fetch_installed)
+
+        for key in list(futures.keys()):
+            try:
+                result = futures[key].result()
+                if key == "repo":
+                    repo_results, repo_err = result
+                    if repo_err:
+                        errors["repo"] = repo_err
+                elif key == "aur":
+                    aur_results, aur_err = result
+                    if aur_err:
+                        errors["aur"] = aur_err
+                elif key == "inst":
+                    installed_set = result
+            except Exception as e:
+                errors[key] = str(e)
+
+    for pkg in repo_results + aur_results:
+        pkg["i"] = pkg["n"] in installed_set
+
+    all_results = repo_results + aur_results
+    if args.installed:
+        all_results = [p for p in all_results if p["i"]]
+
+    repo_sorted = sorted([p for p in all_results if p["s"] != "AUR"], key=lambda x: (x["s"], x["n"]))
+    aur_sorted = sorted([p for p in all_results if p["s"] == "AUR"], key=lambda x: -(x.get("au") or {}).get("pp", 0) or 0)
+    all_results = repo_sorted + aur_sorted
+
+    if args.plain:
+        if errors:
+            for src, msg in errors.items():
+                print(f"[{src}] {msg}", file=sys.stderr)
+        if not all_results:
+            print("no results found")
+            return
+        header = f"{'source':<14} {'name':<38} {'version':<22} {'size':<8} {'notes'}"
+        print(header)
+        print("-" * len(header))
+        for p in all_results:
+            src = p["s"]
+            if p["au"]:
+                a = p["au"]
+                notes = f"votes={a['vt']} pop={a['pp']}"
+                if a["od"]:
+                    notes += " OOD!"
+            else:
+                sz = format_bytes(p["sz"])
+                notes = sz if sz else ""
+            name = f"{p['n']}{' [i]' if p['i'] else ''}"
+            print(f"{src:<14} {name:<38} {p['v']:<22} {sz if not p['au'] else '':<8} {notes}")
+        if errors:
+            print(f"\nerrors: {json.dumps(errors)}", file=sys.stderr)
+    else:
+        output = {"results": all_results}
+        if errors:
+            output["errors"] = errors
+        print(json.dumps(output, separators=(",", ":"), ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()
