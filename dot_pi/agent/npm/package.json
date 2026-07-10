@@ -1,0 +1,11 @@
+{
+  "name": "pi-extensions",
+  "private": true,
+  "dependencies": {
+    "@alexanderfortin/pi-deepseek-usage": "^0.3.10",
+    "@hypabolic/pi-hypa": "^0.1.9",
+    "pi-agent-browser-native": "^0.2.65",
+    "pi-deepseek-search": "^1.0.15",
+    "pi-lens": "^3.8.67"
+  }
+}
