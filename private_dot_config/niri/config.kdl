@@ -3,8 +3,8 @@
 // Check the wiki for a full description of the configuration:
 // https://niri-wm.github.io/niri/Configuration:-Introduction
 
-include "environment.kdl"
-include "hotkeys.kdl"
+include "cfg/env.kdl"
+include "cfg/keybinds.kdl"
 include "noctalia.kdl"
 
 // Round windows: ask clients to omit CSD so niri can draw borders and focus rings
@@ -314,9 +314,9 @@ window-rule {
     opacity 0.90
 }
 
-// Brave Origin: slow down scrolling to match other apps.
+// Brave Origin & Vesktop: slow down scrolling to match other apps.
 window-rule {
-    match app-id=r#"^brave-origin$"#
+    match app-id=r#"^(brave-origin|vesktop|steam)$"#
     scroll-factor 0.15
 }
 

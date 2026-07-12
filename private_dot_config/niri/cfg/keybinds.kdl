@@ -1,4 +1,13 @@
 binds {
+    // Keys consist of modifiers separated by + signs, followed by an XKB key name
+    // in the end. To find an XKB name for a particular key, you may use a program
+    // like wev.
+    //
+    // "Mod" is a special modifier equal to Super when running on a TTY, and to Alt
+    // when running as a winit window.
+    //
+    // Most actions that you can bind here can also be invoked programmatically with
+    // `niri msg action do-something`.
 
     // ────────────── Keybindings ──────────────
     // Noctalia v5 + niri — adapted from garden repo
@@ -22,6 +31,9 @@ binds {
 
     // ─── Screen Locker ───
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "swaylock"; }
+
+    // ─── Screen Reader ───
+    Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
 
     // ─── Volume Keys (via Noctalia) ───
     XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "noctalia msg volume-up"; }

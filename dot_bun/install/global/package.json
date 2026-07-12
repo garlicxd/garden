@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.6",
+    "@huggingface/hub": "^2.13.3",
+    "@hypabolic/hypa": "^0.1.10"
+  }
+}

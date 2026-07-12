@@ -11,7 +11,44 @@ Shelly is the native libalpm package manager. Always use `-j` for JSON output wh
 System hardware specs: [`~/AGENTS.md`](~/AGENTS.md) — reference for any hardware-specific build decisions.
 Shortcodes: `-<Type><Action>` — e.g. `-SI` = install, `-AS` = AUR search, `-FS` = Flatpak search.
 
-## Quick Reference — All Commands
+## Discovery — `pkgsearch` (ALWAYS use first)
+
+**`pkgsearch` is the primary tool for finding packages.** It searches repo + AUR in one call with unified JSON including the source field (`s`). Use it whenever you need to look up what packages exist and where they live.
+
+```bash
+~/.local/bin/pkgsearch <query>        # JSON (LLM mode) — returns {"results": [...]}
+~/.local/bin/pkgsearch -p <query>     # human-readable table
+~/.local/bin/pkgsearch -h             # full options
+```
+
+Flags: `-r` (repo only), `-a` (AUR only), `-i` (installed only), `-n N` (max results per source, default 30).
+
+### pkgsearch JSON schema
+
+```json
+{
+  "results": [
+    {
+      "s": "extra",             // source: repository name or "AUR"
+      "n": "firefox",           // package name
+      "v": "152.0.5-1",         // version
+      "d": "Fast browser",      // description
+      "i": false,               // installed
+      "dl": 85778857,           // download size bytes (0 for AUR)
+      "sz": 300353028,          // installed size bytes (0 for AUR)
+      "au": null                // null for repo; {"vt":322,"pp":0.839,"od":false,"m":"dudemanguy"} for AUR
+    }
+  ]
+}
+```
+
+Results are sorted by source priority (repo first, then AUR by popularity desc). For AUR entries, `au.pp` = popularity score, `au.vt` = votes, `au.m` = maintainer, `au.od` = out-of-date flag.
+
+To install after discovery: `sudo shelly install pkg` (repo) or `sudo shelly aur install pkg` (AUR).
+
+## Quick Reference — Fallback Commands
+
+Use `pkgsearch` for discovery. These raw shelly commands are for install/upgrade/maintenance or when `pkgsearch` is insufficient:
 
 | Area | Action | Command (long) | Shortcode |
 | ------ | -------- | --------------- | ----------- |
@@ -22,7 +59,7 @@ Shortcodes: `-<Type><Action>` — e.g. `-SI` = install, `-AS` = AUR search, `-FS
 | | Full upgrade (repo) | `sudo shelly upgrade` | — |
 | | Upgrade all sources | `sudo shelly upgrade-all` | — |
 | | Upgrade all, skip one | `sudo shelly upgrade-all --no-flatpak` | — |
-| **Standard** | Search | `shelly query -a pkg -j` | `-SAs pkg` |
+| **Standard** | Search (repo only, fallback) | `shelly query -a pkg -j` | `-SAs pkg` |
 | | Info | `shelly query -d pkg -j` | `-Sd pkg` |
 | | Group | `shelly query -g group -j` | `-Sg group` |
 | | Install | `sudo shelly install pkg` | `-SI pkg` |
@@ -32,7 +69,7 @@ Shortcodes: `-<Type><Action>` — e.g. `-SI` = install, `-AS` = AUR search, `-FS
 | | Downgrade | `shelly downgrade -l pkg` (list)→`sudo shelly downgrade -t ver pkg` | — |
 | | Ignore | `sudo shelly ignore -a pkg` / `-r pkg` / `-l` | — |
 | | Mark as explicit/dep | `sudo shelly mark pkg` | — |
-| **AUR** | Search | `shelly aur search query -j` | `-AS query` |
+| **AUR** | Search (AUR only, fallback) | `shelly aur search query -j` | `-AS query` |
 | | Fetch PKGBUILD | `shelly aur search-pkgbuild pkg -j` | — |
 | | Install | `sudo shelly aur install pkg` | — |
 | | Install at commit | `sudo shelly aur install-version pkg <sha>` | — |
@@ -166,18 +203,6 @@ rm -rf /tmp/build-pkg     # on success
 ```
 
 ---
-
-## Pre-Install Search
-
-Before installing, discover packages across all sources with `pkgsearch`:
-
-```
-~/.local/bin/pkgsearch <query>    # JSON (LLM mode) — parse "n" (name) + "s" (source), then install
-~/.local/bin/pkgsearch -p <query>  # human-readable table
-~/.local/bin/pkgsearch -h          # full options
-```
-
-Flags: `-r` (repo only), `-a` (AUR only), `-i` (installed only), `-n N` (limit).
 
 ---
 

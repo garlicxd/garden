@@ -1,16 +1,29 @@
 {
-  "lastChangelogVersion": "0.80.2",
+  "lastChangelogVersion": "0.80.6",
   "theme": "noctalia",
   "defaultProvider": "deepseek",
   "defaultModel": "deepseek-v4-flash",
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "max",
   "extensions": [],
   "npmCommand": [
     "bun"
   ],
   "shellCommandPrefix": "export PATH=\"$HOME/.bun/bin:$PATH\"; alias node=bun; alias npm=bun; alias npx=bunx; alias pnpm=bun; alias yarn=bun; ",
-  "packages": [],
+  "packages": [
+    "npm:@alexanderfortin/pi-deepseek-usage",
+    "npm:pi-deepseek-search",
+    "npm:@hypabolic/pi-hypa",
+    "npm:pi-lens"
+  ],
   "compaction": {
     "enabled": true
-  }
+  },
+  "editorPaddingX": 1,
+  "outputPad": 1,
+  "terminal": {
+    "showTerminalProgress": true
+  },
+  "enableInstallTelemetry": false,
+  "defaultProjectTrust": "always",
+  "hideThinkingBlock": false
 }

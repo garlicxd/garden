@@ -6,6 +6,11 @@
 .pi/agent/bin
 
 
+# Bun — track only package.json (package list), ignore lockfile + node_modules
+.bun/install/global/node_modules
+.bun/install/global/bun.lock
+
+
 # Noctalia — ignore ephemeral state (cache, clipboard, history)
 .local/state/noctalia/clipboard
 .local/state/noctalia/notification_history.json
