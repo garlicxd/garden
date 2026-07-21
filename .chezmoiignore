@@ -21,5 +21,8 @@
 .local/state/noctalia/.setup-complete
 .local/state/noctalia/plugins
 
+# Systemd unit files — reference copies tracked in repo, not applied to $HOME
+systemd-units/
+
 # Package lists — reference data tracked in repo, not applied to $HOME
 pkglists/

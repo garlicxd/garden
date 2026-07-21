@@ -1,0 +1,10 @@
+[Unit]
+Description=Disable lid wakeup trigger in ACPI
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "grep -q 'LID0.*enabled' /proc/acpi/wakeup && echo LID0 > /proc/acpi/wakeup || true"
+
+[Install]
+WantedBy=multi-user.target

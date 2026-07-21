@@ -1,0 +1,53 @@
+#!/bin/bash
+# Restore systemd services from chezmoi reference data.
+# Run after chezmoi init on a new machine.
+#
+# This script:
+#   1. Installs custom system unit files (from systemd-units/ → /etc/systemd/system/)
+#   2. Installs custom user unit files (tracked via dot_config/systemd/ → ~/.config/systemd/user/)
+#   3. Enables all services that were enabled on the source machine
+
+set -euo pipefail
+
+SOURCE_DIR="{{ .chezmoi.sourceDir }}"
+SYSTEM_UNITS="$SOURCE_DIR/systemd-units"
+PKGLISTS="$SOURCE_DIR/pkglists"
+
+echo "=== Restoring custom systemd unit files ==="
+
+# Copy custom system unit files (needs sudo)
+if [ -d "$SYSTEM_UNITS" ]; then
+    for unit in "$SYSTEM_UNITS"/*.service; do
+        [ -f "$unit" ] || continue
+        name="$(basename "$unit")"
+        echo "  Installing system unit: $name"
+        sudo cp "$unit" "/etc/systemd/system/$name"
+    done
+    sudo systemctl daemon-reload
+fi
+
+echo ""
+echo "=== Enabling system services ==="
+
+if [ -f "$PKGLISTS/enabled-system-services.txt" ]; then
+    while IFS= read -r service; do
+        [ -n "$service" ] || continue
+        echo "  Enabling system: $service"
+        sudo systemctl enable "$service" 2>/dev/null || echo "    Warning: could not enable $service (not installed yet?)"
+    done < "$PKGLISTS/enabled-system-services.txt"
+fi
+
+echo ""
+echo "=== Enabling user services ==="
+
+if [ -f "$PKGLISTS/enabled-user-services.txt" ]; then
+    while IFS= read -r service; do
+        [ -n "$service" ] || continue
+        echo "  Enabling user: $service"
+        systemctl --user enable "$service" 2>/dev/null || echo "    Warning: could not enable $service (not installed yet?)"
+    done < "$PKGLISTS/enabled-user-services.txt"
+fi
+
+echo ""
+echo "=== Done ==="
+echo "Run 'sudo systemctl start <service>' for any services that need immediate starting."

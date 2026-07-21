@@ -1,0 +1,17 @@
+ananicy-cpp.service
+avahi-daemon.service
+bluetooth.service
+disable-lid-wakeup.service
+dmemcg-booster-system.service
+docker.service
+getty@.service
+greetd.service
+intel_lpmd.service
+keyd.service
+limine-snapper-sync.service
+NetworkManager-dispatcher.service
+NetworkManager-wait-online.service
+NetworkManager.service
+systemd-resolved.service
+systemd-timesyncd.service
+ufw.service
