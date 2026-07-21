@@ -1,0 +1,3 @@
+intel-npu-driver
+noctalia-git
+noctalia-greeter

@@ -20,3 +20,6 @@
 .local/state/noctalia/community-templates
 .local/state/noctalia/.setup-complete
 .local/state/noctalia/plugins
+
+# Package lists — reference data tracked in repo, not applied to $HOME
+pkglists/
