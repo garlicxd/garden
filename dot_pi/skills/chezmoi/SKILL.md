@@ -46,6 +46,9 @@ Patterns match against **destination paths** (relative to `$HOME`). When new fil
 .pi/agent/npm/node_modules
 .pi/agent/bin
 
+# Package lists — reference data tracked in repo, not applied to $HOME
+pkglists/
+
 # Bun — track only package.json (package list), ignore lockfile + node_modules
 .bun/install/global/node_modules
 .bun/install/global/bun.lock
@@ -76,11 +79,45 @@ chezmoi git add . && chezmoi git -- commit -m "..." && chezmoi git -- push
 
 ## Source Path Conventions
 
-| Prefix      | Meaning                              | Example → Target                     |
-|-------------|--------------------------------------|--------------------------------------|
-| `dot_`      | Prepend `.` to name                  | `dot_pi`       → `.pi`              |
-| `private_`  | Restrictive permissions (700/600)    | `private_dot_config` → `.config`    |
-| `executable_`| Make file executable                | `executable_colony-model` → `colony-model` |
+| Prefix       | Meaning                              | Example → Target                     |
+|--------------|--------------------------------------|--------------------------------------|
+| `dot_`       | Prepend `.` to name                  | `dot_pi`              → `.pi`        |
+| `private_`   | Restrictive permissions (700/600)    | `private_bin`  → `bin` (subdir)     |
+| `executable_`| Make file executable                 | `executable_colony-model` → `colony-model` |
+| `.tmpl` suffix | Marks file as a Go template        | `foo.sh.tmpl` → `foo.sh` (rendered) |
+
+### Template files (`.tmpl` suffix)
+
+Files ending in `.tmpl` are processed as Go templates by chezmoi before being written to their destination. The `.tmpl` is stripped from the target name.
+
+**Useful template variables:**
+
+| Expression | What it expands to |
+|---|---|
+| `{{ .chezmoi.sourceDir }}` | Absolute path to the chezmoi source dir (`~/.local/share/chezmoi/`) |
+| `{{ include "path/from/source/root" | sha256sum }}` | SHA256 hash of a file in the source tree |
+| `{{ .chezmoi.hostname }}` | Machine hostname |
+| `{{ .chezmoi.os }}` | OS identifier (e.g. `linux`) |
+| `{{ .chezmoi.arch }}` | Architecture (e.g. `amd64`) |
+
+**Example** — a script that references the source directory and includes checksums:
+
+```bash
+#!/bin/bash
+# sha256: {{ include "pkglists/pacman.txt" | sha256sum }}
+pacman -S --needed - < {{ .chezmoi.sourceDir }}/pkglists/pacman.txt
+```
+
+**Adding a template file:**
+
+```bash
+# 1. Write the file with .tmpl extension in the source dir
+# 2. Or let chezmoi add it (it will auto-detect template syntax)
+chezmoi add ~/.local/bin/my-script.sh
+# If the file contains {{ }} syntax, chezmoi prompts about adding .tmpl
+```
+
+> **Gotcha:** When `chezmoi diff` shows `MM` for a `.tmpl` file, that's normal — the source has raw template syntax and the destination has the rendered output. The `M` on both sides is expected.
 
 The `private_` prefix appears because `$HOME` has mode `700`. This is normal — don't remove it.
 
@@ -197,15 +234,115 @@ chezmoi init --apply git@github.com:garlicxd/garden
 chezmoi update
 ```
 
+### Package Lists Setup
+
+After the initial `chezmoi init`, install packages from the tracked lists:
+
+```bash
+# Official packages
+sudo pacman -S --needed - < ~/.local/share/chezmoi/pkglists/pacman.txt
+
+# AUR packages (with shelly, paru, or yay)
+shelly install --noconfirm - < ~/.local/share/chezmoi/pkglists/aur.txt
+```
+
+Or run the automated script (which does this + bun install):
+
+```bash
+~/.local/bin/update-chezmoi-pkglist.sh
+```
+
+> The script is a chezmoi template — on `chezmoi apply` it renders with the correct paths.
+
+## Package List Automation
+
+Explicitly installed packages (official + AUR) are automatically exported after every pacman/shelly transaction and tracked in the repo for reference and new-machine bootstrapping.
+
+### Export (automatic via ALPM hook)
+
+**Trigger:** Any `Install` or `Remove` transaction in pacman or shelly.
+
+**Hook:** `/etc/pacman.d/hooks/95-chezmoi-pkglist.hook`
+
+```ini
+[Trigger]
+Operation = Install
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Updating chezmoi package lists...
+When = PostTransaction
+Exec = /usr/bin/runuser -u <USER> -- /home/<USER>/.local/bin/export-chezmoi-pkglist.sh
+```
+
+**Key details:**
+- ALPM hooks run as `root` — `runuser -u <USER>` drops privileges so output files stay user-owned
+- The hook fires after every package transaction (`PostTransaction`)
+- Files are written to `~/.local/share/chezmoi/pkglists/{pacman,aur}.txt` (inside the source dir)
+
+**Export script (called by hook):** `~/.local/bin/export-chezmoi-pkglist.sh`
+
+**Source:** `dot_local/private_bin/executable_export-chezmoi-pkglist.sh`
+
+```bash
+#!/bin/bash
+TARGET_DIR="$HOME/.local/share/chezmoi/pkglists"
+mkdir -p "$TARGET_DIR"
+pacman -Qqen > "$TARGET_DIR/pacman.txt"
+pacman -Qqem > "$TARGET_DIR/aur.txt"
+```
+
+### Install (chezmoi template for new machines)
+
+Separate script at `~/.local/bin/update-chezmoi-pkglist.sh` installs packages FROM the lists on a new machine. It's a chezmoi template (`.tmpl` source) — `{{ .chezmoi.sourceDir }}` gets expanded to the actual path, and package-list hashes are computed at render time.
+
+On a new machine, `chezmoi init --apply` renders this template to `~/.local/bin/update-chezmoi-pkglist.sh`, then you run it to bootstrap packages.
+
+**Source:** `dot_local/private_bin/executable_update-chezmoi-pkglist.sh.tmpl`
+
+```bash
+#!/bin/bash
+# pacman.txt hash: {{ include "pkglists/pacman.txt" | sha256sum }}
+# aur.txt hash: {{ include "pkglists/aur.txt" | sha256sum }}
+
+if command -v pacman &> /dev/null; then
+    sudo pacman -S --needed --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/pacman.txt
+fi
+
+if command -v shelly &> /dev/null; then
+    shelly install --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/aur.txt
+elif command -v paru &> /dev/null; then
+    paru -S --needed --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/aur.txt
+elif command -v yay &> /dev/null; then
+    yay -S --needed --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/aur.txt
+fi
+
+if command -v bun &> /dev/null; then
+    bun add -g @earendil-works/pi-coding-agent
+fi
+```
+
+### What's tracked in pkglists/
+
+| File | Source | Generated by |
+|------|--------|-------------|
+| `pkglists/pacman.txt` | Official repo packages (`pacman -Qqen`) | ALPM hook after every Install/Remove |
+| `pkglists/aur.txt` | Foreign/AUR packages (`pacman -Qqem`) | ALPM hook after every Install/Remove |
+
+These are **reference data only** — `pkglists/` is in `.chezmoiignore` so they're never applied to `$HOME`.
+
 ## What's Currently Tracked
 
 | Category        | Path in Repo                            | Manages                           |
 |-----------------|-----------------------------------------|-----------------------------------|
-| Niri WM         | `private_dot_config/niri/`              | Config + `cfg/*.kdl` modular dir  |
-| Noctalia        | `private_dot_config/noctalia/`          | Settings, colors, plugins, themes |
-| Local scripts   | `private_dot_local/private_bin/`        | `colony-model`, `start-portal.sh`, `pi/` |
-| Noctalia state  | `private_dot_local/private_state/noctalia/` | `settings.toml` only          |
+| Niri WM         | `dot_config/niri/`              | Config + `cfg/*.kdl` modular dir  |
+| Noctalia        | `dot_config/noctalia/`          | Settings, colors, plugins, themes |
+| Local scripts   | `dot_local/private_bin/`        | `colony-model`, `start-portal.sh`, `pi/`, `export-chezmoi-pkglist.sh`, `update-chezmoi-pkglist.sh.tmpl` |
+| Noctalia state  | `dot_local/private_state/noctalia/` | `settings.toml` only          |
 | Pi agent        | `dot_pi/`                               | Settings, models, extensions, themes, skills |
+| Package lists   | `pkglists/`                             | Exported package lists (ignored by apply)    |
 
 ## Tips
 
