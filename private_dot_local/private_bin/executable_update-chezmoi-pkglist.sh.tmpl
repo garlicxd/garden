@@ -1,0 +1,19 @@
+#!/bin/bash
+# pacman.txt hash: {{ include "pkglists/pacman.txt" | sha256sum }}
+# aur.txt hash: {{ include "pkglists/aur.txt" | sha256sum }}
+
+if command -v pacman &> /dev/null; then
+    sudo pacman -S --needed --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/pacman.txt
+fi
+
+if command -v shelly &> /dev/null; then
+    shelly install --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/aur.txt
+elif command -v paru &> /dev/null; then
+    paru -S --needed --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/aur.txt
+elif command -v yay &> /dev/null; then
+    yay -S --needed --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/aur.txt
+fi
+
+if command -v bun &> /dev/null; then
+    bun add -g @earendil-works/pi-coding-agent
+fi
