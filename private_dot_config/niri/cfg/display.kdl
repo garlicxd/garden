@@ -1,4 +1,0 @@
-// ────────────── Display Configuration ──────────────
-// Outputs are configured in config.kdl (top-level)
-// Run `niri msg outputs` to list available outputs.
-// https://github.com/YaLTeR/niri/wiki/Configuration:-Outputs

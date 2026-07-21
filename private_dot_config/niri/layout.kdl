@@ -1,0 +1,38 @@
+// Settings that influence how windows are positioned and sized.
+// https://niri-wm.github.io/niri/Configuration:-Layout
+layout {
+    // Transparent background so Noctalia wallpaper shows through.
+    background-color "transparent"
+
+    // Gaps around windows in logical pixels.
+    gaps 16
+
+    // When to center a column when changing focus.
+    center-focused-column "never"
+
+    // Customize widths that switch-preset-column-width (Mod+R) toggles between.
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+    }
+
+    // Default width of new windows.
+    default-column-width { proportion 0.5; }
+
+    // Drop shadows for windows.
+    shadow {
+        softness 30
+        spread 5
+        offset x=0 y=5
+        color "#0007"
+    }
+
+    // Struts shrink the area occupied by windows.
+    struts {
+        // left 64
+        // right 64
+        // top 64
+        // bottom 64
+    }
+}

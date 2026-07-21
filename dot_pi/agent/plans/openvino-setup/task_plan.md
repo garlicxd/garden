@@ -41,17 +41,20 @@
 
 - [x] **3. Install OpenVINO runtime + plugins (AUR)** — ✅ done (all 2026.2.1-2) — openvino, openvino-intel-gpu-plugin, openvino-intel-npu-plugin
       *Dependencies:* steps 1, 2 (needs drivers + level-zero)
-      *Files touched:* system packages; installs to `/opt/intel/openvino/`
+      *Files touched:* system packages; installs to `/usr/` (headers: /usr/include/openvino/, libs: /usr/lib/, plugins: /usr/lib/openvino/)
       *Build time:* 2-4 hours (source compilation with CPU/GPU/NPU backends)
+      *CMake:* `OpenVINO_DIR=/usr/lib/cmake/openvino/`
       *Rollback:* `sudo shelly aur remove openvino openvino-intel-gpu-plugin openvino-intel-npu-plugin`
 
-- [ ] **4. Post-install config** — udev rules, user groups, Docker, cache dir
+- [x] **4. Post-install config** — ✅ done (render group, udev, docker, cache dir) — udev rules, user groups, Docker, cache dir
       *Dependencies:* steps 1–3
       *Rollback:* reverse each command (remove udev rule, remove user from render group, etc.)
 
-- [ ] **5. Verify** — confirm all devices detected, runtime works
-      *Dependencies:* step 4
-      *Commands:* lspci, journalctl, /dev/accel detection, `ls /opt/intel/openvino/`
+- [x] **5. Verify** — ✅ done
+      *CPU:* Intel Core Ultra X7 358H ✅
+      *GPU:* Intel Arc B390 GPU (iGPU) ✅
+      *NPU:* Intel AI Boost ✅ (needs re-login for render group)
+      *OpenVINO:* Python openvino 2026.2.1 ✅
 
 ---
 

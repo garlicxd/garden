@@ -23,11 +23,15 @@ binds {
     Mod+E hotkey-overlay-title="File Manager" { spawn-sh "$FILE_MANAGER"; }
     Mod+B hotkey-overlay-title="Browser" { spawn-sh "$BROWSER"; }
 
+    // ─── Qwen MoE Toggle ───
+    Mod+Semicolon hotkey-overlay-title="Toggle Qwen MoE" { spawn-sh "qwen --toggle"; }
+
     // ─── Screenshots ───
     Mod+S hotkey-overlay-title="Screenshot Region" { spawn-sh "noctalia msg screenshot-region"; }
     Print { spawn-sh "noctalia msg screenshot-region"; }
     Ctrl+Print { spawn-sh "noctalia msg screenshot-fullscreen"; }
     Alt+Print { spawn-sh "noctalia msg screenshot-fullscreen pick"; }
+    Shift+Print hotkey-overlay-title="Screenshot Window" { screenshot-window; }
 
     // ─── Screen Locker ───
     Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn "swaylock"; }

@@ -143,11 +143,11 @@ STEP 3: OPENVINO RUNTIME (INSTALLED VIA AUR IN STEP 1.2)
 3.1 The OpenVINO runtime, GPU plugin, and NPU plugin were installed from AUR in Step 1.2
     (packages: openvino, openvino-intel-gpu-plugin, openvino-intel-npu-plugin).
     These compile from source with all hardware backends enabled (CPU, GPU, NPU).
-    Installed to: /opt/intel/openvino/
-    Build time: 2-4 hours. Ensure MAKEFLAGS="-j4" is set before starting Step 1.2.
+    Installed to: /usr/ (headers: /usr/include/openvino/, libraries: /usr/lib/,
+    plugins: /usr/lib/openvino/). Build time: 2-4 hours.
 
-    The compiled runtime provides the same cmake config as a manual build:
-    OpenVINO_DIR=/opt/intel/openvino/runtime/cmake
+    CMake config (for downstream C++ builds linking against OpenVINO):
+    OpenVINO_DIR=/usr/lib/cmake/openvino/
 
     (The manual git-clone source build from the original guide is no longer needed —
      the AUR packages handle this with the same CMake flags: -DENABLE_INTEL_CPU=ON
@@ -171,7 +171,7 @@ git clone --recursive <https://github.com/openvinotoolkit/openvino.genai.git> $H
 cd $HOME/Documents/colony/openvino.genai && mkdir build && cd build
 5.2 Run CMake pointing to the AUR-installed OpenVINO (not a manual build):
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DOpenVINO_DIR=/opt/intel/openvino/runtime/cmake \
+  -DOpenVINO_DIR=/usr/lib/cmake/openvino/ \
   -DENABLE_PYTHON=OFF -DENABLE_SAMPLES=ON -DENABLE_TESTS=OFF ..
 cmake --build . --config Release --parallel 4
 5.3 Compile your custom native bridging program ~/Documents/colony/ov_inference.cpp:
@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
     }
     return 0;
 }
-EOF5.4 Compile the custom C++ executor using CMake and standard C++17 rules:clang++ -std=c++17 -O3 -fuse-ld=lld $HOME/Documents/colony/ov_inference.cpp -I/opt/intel/openvino/runtime/include -I$HOME/Documents/colony/openvino.genai/runtime/include -I$HOME/Documents/colony/openvino.genai/runtime/include/openvino/genai -L/opt/intel/openvino/runtime/lib/intel64 -L$HOME/Documents/colony/openvino.genai/build/runtime/lib/intel64/Release -lopenvino -lopenvino_genai -o $HOME/Documents/colony/ov_inference=========================================
+EOF5.4 Compile the custom C++ executor using CMake and standard C++17 rules:clang++ -std=c++17 -O3 -fuse-ld=lld $HOME/Documents/colony/ov_inference.cpp -I$HOME/Documents/colony/openvino.genai/runtime/include -I$HOME/Documents/colony/openvino.genai/runtime/include/openvino/genai -L$HOME/Documents/colony/openvino.genai/build/runtime/lib/intel64/Release -lopenvino -lopenvino_genai -o $HOME/Documents/colony/ov_inference=========================================
 STEP 6: OPENVINO MODEL SERVER DEPLOYMENT6.1 Create the OVMS multi-model configuration file:cat << 'EOF' > $HOME/Documents/colony/config.json{"model_config_list": [{"config": {"name": "qwen-moe","base_path": "/workspace/models/qwen-moe","target_device": "GPU","plugin_config": {"PERFORMANCE_HINT": "LATENCY","KEY_VALUE_CACHE_PRECISION": "u8"}}},{"config": {"name": "qwen-omni","base_path": "/workspace/models/qwen-omni","target_device": "NPU","plugin_config": {"PERFORMANCE_HINT": "LATENCY"},"batch_size": "1"}}]}EOF6.2 Create the Docker Compose orchestration layer:cat << 'EOF' > $HOME/Documents/colony/docker-compose.ymlversion: '3.8'services:ovms-server:image: openvino/model_server:latest-gpucontainer_name: ovms-heterogeneous-servingports:- "8000:8000"- "9000:9000"volumes:- /home/user/Documents/colony/config.json:/workspace/config.json:ro- /home/user/Documents/colony/models:/workspace/models:rodevices:- /dev/dri:/dev/dri- /dev/accel/accel0:/dev/accel/accel0environment:- UR_L0_ENABLE_RELAXED_ALLOCATION_LIMITS=1- ONEAPI_DEVICE_SELECTOR=level_zero:0- SYCL_PI_LEVEL_ZERO_USE_IMMEDIATE_COMMANDLISTS=1- ZES_ENABLE_SYSMAN=1user: "${UID}:${GID}"group_add:- "${RENDER_GID}"restart: alwayscommand: /ovms/bin/ovms --config_path /workspace/config.json --port 9000 --rest_port 8000EOF6.3 Gather GIDs from the host and start the server:export UID=$(id -u)
 export GID=$(id -g)export RENDER_GID=$(stat -c "%g" /dev/dri/render* | head -n 1)docker compose -f $HOME/Documents/colony/docker-compose.yml up -d=========================================
 STEP 7: PI CODING AGENT INTEGRATION via BUN7.1 Install the Pi Coding Agent using Bun's fast native engine:bun add -g --ignore-scripts @earendil-works/pi-coding-agent7.2 Expose Bun's binary path to your terminal's dynamic environments:export PATH="$HOME/.bun/bin:$PATH"echo 'export PATH="$HOME/.bun/bin:$PATH"' >> $HOME/.zshrc7.3 Write the config integration template to ~/.pi/agent/models.json:mkdir -p $HOME/.pi/agent

@@ -46,6 +46,10 @@ Patterns match against **destination paths** (relative to `$HOME`). When new fil
 .pi/agent/npm/node_modules
 .pi/agent/bin
 
+# Bun — track only package.json (package list), ignore lockfile + node_modules
+.bun/install/global/node_modules
+.bun/install/global/bun.lock
+
 # Noctalia — ephemeral state (cache, clipboard, history, community data)
 .local/state/noctalia/clipboard
 .local/state/noctalia/notification_history.json
@@ -101,12 +105,39 @@ chezmoi re-add
 # See what chezmoi manages
 chezmoi managed --include=files | sort
 
+# See what's NOT managed (unmanaged files in home dir)
+chezmoi unmanaged
+
 # Compare source file vs actual file
 chezmoi diff ~/.config/some-app/settings.toml
 
 # Remove a file from chezmoi management (without deleting the real file)
 chezmoi unmanage ~/.config/some-app/settings.toml
 ```
+
+## Understanding `chezmoi status` Output
+
+The status output has two columns (like `git status`), but the meaning is different.
+
+| Char | 1st col: last-written vs actual state | 2nd col: actual state vs target (source) |
+|------|--------------------------------------|------------------------------------------|
+| ` `  | No change                            | No change / entry stays as-is            |
+| `A`  | Entry was **created** in actual       | Entry will be **created** by apply       |
+| `D`  | Entry was **deleted** from actual     | Entry will be **deleted** by apply       |
+| `M`  | Entry was **modified** in actual      | Entry will be **modified** by apply      |
+
+### Common status patterns
+
+| Pattern | Meaning | Action needed |
+|---------|---------|---------------|
+| `  ` (clean) | Source, last-applied, and actual all match | Nothing |
+| `MM` | Both source AND actual diverged from last-applied | `chezmoi re-add` to sync source → actual |
+| `DA` | File exists in **source** but was **deleted from disk** | `chezmoi apply` to restore, OR `chezmoi unmanage` to remove from source |
+| `AM` | File exists on disk but not in source | `chezmoi add` to track it (whole dirs) |
+| ` D` | File deleted from disk, source has it | `chezmoi apply` to restore, or `chezmoi rm` to confirm deletion |
+| `AD` | File added to source but deleted from disk | `chezmoi apply` to restore |
+
+**Key insight:** `chezmoi re-add` updates the **source** to match the **actual** (disk). It handles `MM` entries. It does NOT handle `DA` entries — those need manual handling (apply or unmanage).
 
 ## Sync Workflow (add → commit → push)
 
@@ -121,28 +152,37 @@ chezmoi git -- push
 
 **Important:** `chezmoi git` needs `--` before any git flags (e.g., `-m`). Without `--`, chezmoi tries to parse them as its own flags.
 
-## Sync Machine State (re-add → commit → push)
+## Sync Machine State (re-add → status-check → handle DAs → commit → push)
 
-When the local machine has drifted from the repo (e.g., you changed configs and want to capture the current state), use `chezmoi re-add` instead of `chezmoi add`:
+When the local machine has drifted from the repo (e.g., you changed configs and want to capture the current state), use this workflow:
 
 ```bash
 # 1. Re-add all modified tracked files to match current state
 chezmoi re-add
 
-# 2. Add any new untracked files
-chezmoi add ~/.config/some-app     # whole dirs, not individual files
+# 2. Check what's left — `DA` entries won't be handled by re-add
+chezmoi status
 
-# 3. Verify
-chezmoi status        # should be clean
-chezmoi diff          # optional, double-check
+# 3a. For DA entries: if the file was intentionally removed from disk,
+#     remove it from chezmoi source too:
+chezmoi unmanage ~/.config/some-app/some-file
 
-# 4. Commit & push
+# 3b. Or if the file should exist on disk, restore it:
+chezmoi apply ~/.config/some-app/some-file
+
+# 4. Add any new untracked files (whole dirs, not individual files)
+chezmoi add ~/.config/some-app     # only if not already tracked
+
+# 5. Final verification — should be clean (no output)
+chezmoi status
+
+# 6. Commit & push
 chezmoi git add .
 chezmoi git -- commit -m "Sync machine state: <description>"
 chezmoi git -- push
 ```
 
-`chezmoi re-add` with no args updates all modified managed files at once — it's the fastest way to sync the repo to the current machine.
+`chezmoi re-add` with no args updates all modified managed files at once — it's the fastest way to sync the repo to the current machine. Always verify with `chezmoi status` afterward because some entries (like `DA`) need manual handling.
 
 ## Setup on a New Machine
 
@@ -174,3 +214,6 @@ chezmoi update
 - **Ignored files still show up in `chezmoi add` output** — they just say "warning: ignoring" and aren't copied to the source dir.
 - **Edit tool edits the destination, not the source** — when using pi's `edit` tool (or any editor) on a managed file, you're modifying `~/dot_config/...`, not `~/.local/share/chezmoi/dot_config/...`. After editing, run `chezmoi re-add ~/.config/path/to/file` to sync the source before committing.
 - **`chezmoi re-add` is a snapshot** — it only picks up files modified *at the moment you run it*. If you edit more files afterward, run `chezmoi re-add` again (or for individual files) before committing.
+- **`chezmoi unmanaged` shows files in `$HOME` not tracked** — useful for finding things you forgot to add or should add to `.chezmoiignore`.
+- **`--` dash-dash is required before git flags** — e.g. `chezmoi git -- commit -m "msg"` not `chezmoi git commit -m`. Without `--`, chezmoi tries to parse flags itself.
+- **`chezmoi diff` shows source vs actual in git format** — `--- /dev/null` means the actual file doesn't exist on disk; `+++ /dev/null` means the source doesn't have it.

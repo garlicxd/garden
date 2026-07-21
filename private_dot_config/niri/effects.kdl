@@ -1,0 +1,5 @@
+// Global blur settings — fine-tune the blur effect.
+blur {
+    passes 3         // number of blur passes
+    offset 3.0       // sample distance per pass
+}

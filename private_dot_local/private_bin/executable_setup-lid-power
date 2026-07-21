@@ -1,0 +1,101 @@
+#!/bin/bash
+# Provision lid/power button config: lid = screen only, power button = suspend/wake
+# Must be run as root (pkexec or sudo)
+
+set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "This script must be run as root — use: pkexec setup-lid-power" >&2
+    exit 1
+fi
+
+echo "=== 1. Configuring systemd-logind ==="
+cat > /etc/systemd/logind.conf << 'EOF'
+#  This file is part of systemd.
+#
+#  systemd is free software; you can redistribute it and/or modify it under the
+#  terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation; either version 2.1 of the License, or (at your option)
+#  any later version.
+#
+# Entries in this file show the compile time defaults. Local configuration
+# should be created by either modifying this file (or a copy of it placed in
+# /etc/ if the original file is shipped in /usr/), or by creating "drop-ins" in
+# the /etc/systemd/logind.conf.d/ directory. The latter is generally
+# recommended. Defaults can be restored by simply deleting the main
+# configuration file and all drop-ins located in /etc/.
+#
+# Use 'systemd-analyze cat-config systemd/logind.conf' to display the full config.
+#
+# See logind.conf(5) for details.
+
+[Login]
+#NAutoVTs=6
+#ReserveVT=6
+#KillUserProcesses=no
+#KillOnlyUsers=
+#KillExcludeUsers=root
+#InhibitDelayMaxSec=5
+#UserStopDelaySec=10
+#SleepOperation=suspend-then-hibernate suspend
+HandlePowerKey=suspend
+HandlePowerKeyLongPress=ignore
+#HandleRebootKey=reboot
+#HandleRebootKeyLongPress=poweroff
+#HandleSuspendKey=suspend
+#HandleSuspendKeyLongPress=hibernate
+#HandleHibernateKey=hibernate
+#HandleHibernateKeyLongPress=ignore
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+#HandleSecureAttentionKey=secure-attention-key
+#PowerKeyIgnoreInhibited=no
+#SuspendKeyIgnoreInhibited=no
+#HibernateKeyIgnoreInhibited=no
+#LidSwitchIgnoreInhibited=yes
+#RebootKeyIgnoreInhibited=no
+#HoldoffTimeoutSec=30s
+#IdleAction=ignore
+#IdleActionSec=30min
+#RuntimeDirectorySize=10%
+#RuntimeDirectoryInodesMax=
+#RemoveIPC=yes
+#InhibitorsMax=8192
+#SessionsMax=8192
+#StopIdleSessionSec=infinity
+#DesignatedMaintenanceTime=
+#WallMessages=yes
+EOF
+echo "  ✓ /etc/systemd/logind.conf written"
+
+echo "=== 2. Detecting lid switch ACPI name ==="
+LID=$(grep -i lid /proc/acpi/wakeup | awk '{print $1}' | head -1)
+if [ -z "$LID" ]; then
+    echo "  ✗ No lid switch found in /proc/acpi/wakeup — skipping wakeup disable" >&2
+else
+    echo "  Found: $LID"
+    echo "=== 3. Creating lid-wakeup disable service ==="
+    cat > /etc/systemd/system/disable-lid-wakeup.service << EOF
+[Unit]
+Description=Disable lid wakeup trigger in ACPI
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c "grep -q '${LID}.*enabled' /proc/acpi/wakeup && echo ${LID} > /proc/acpi/wakeup || true"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    chmod 644 /etc/systemd/system/disable-lid-wakeup.service
+    echo "  ✓ /etc/systemd/system/disable-lid-wakeup.service written"
+
+    echo "=== 4. Enabling service ==="
+    systemctl enable disable-lid-wakeup.service
+    echo "  ✓ Service enabled"
+fi
+
+echo ""
+echo "=== Done ==="
+echo "Reboot to apply. (Do NOT restart systemd-logind or your niri session will terminate.)"

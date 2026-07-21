@@ -1,9 +1,9 @@
 {
-  "lastChangelogVersion": "0.80.6",
+  "lastChangelogVersion": "0.81.1",
   "theme": "noctalia",
   "defaultProvider": "deepseek",
   "defaultModel": "deepseek-v4-flash",
-  "defaultThinkingLevel": "max",
+  "defaultThinkingLevel": "high",
   "extensions": [],
   "npmCommand": [
     "bun"
@@ -25,5 +25,5 @@
   },
   "enableInstallTelemetry": false,
   "defaultProjectTrust": "always",
-  "hideThinkingBlock": false
+  "hideThinkingBlock": true
 }

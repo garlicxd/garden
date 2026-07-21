@@ -1,5 +1,15 @@
+config_version = 2
+
+[accessibility]
+ui_scale = 1.1500000096857548
+
+[audio]
+enable_overdrive = true
+enable_sounds = true
+
 [bar.default]
-background_opacity = 0.4999999888241291
+background_opacity = 0.69999998435378075
+border = "primary"
 center = [ "audio_visualizer" ]
 end = [
     "media",
@@ -21,11 +31,21 @@ start = [ "notifications", "clock", "workspaces" ]
 thickness = 50
 widget_spacing = 12
 
+[calendar]
+enabled = true
+
+    [calendar.account.home_nextcloud]
+    name = "Personal Google Calendar"
+    type = "google"
+
 [desktop_widgets]
 enabled = false
 
+[location]
+auto_locate = true
+
 [lockscreen_widgets]
-enabled = false
+enabled = true
 schema_version = 2
 widget_order = [ "lockscreen-login-box@eDP-1" ]
 
@@ -35,8 +55,8 @@ widget_order = [ "lockscreen-login-box@eDP-1" ]
     visible = true
 
     [lockscreen_widgets.widget."lockscreen-login-box@eDP-1"]
-    box_height = 0.0
-    box_width = 0.0
+    box_height = 70.0
+    box_width = 400.0
     cx = 823.0
     cy = 906.0
     output = "eDP-1"
@@ -49,13 +69,20 @@ widget_order = [ "lockscreen-login-box@eDP-1" ]
         background_radius = 12.0
         input_opacity = 1.0
         input_radius = 6.0
+        show_caps_lock = true
+        show_keyboard_layout = true
         show_login_button = true
+        show_password_hint = true
+
+[nightlight]
+enabled = true
 
 [plugins]
 enabled = [ "noctalia/screen_recorder" ]
 
 [shell]
 app_icon_colorize = true
+niri_overview_type_to_launch_enabled = true
 password_style = "random"
 polkit_agent = true
 settings_show_advanced = true
@@ -64,8 +91,17 @@ ui_scale = 1.5000000149011612
     [shell.animation]
     speed = 0.80000001192092896
 
+    [shell.greeter_sync]
+    auto_sync = true
+
+    [shell.panel]
+    open_near_click_session = true
+
     [shell.screen_corners]
     enabled = true
+
+[system.monitor]
+gpu_poll_seconds = 2
 
 [theme]
 builtin = "Rosé Pine"

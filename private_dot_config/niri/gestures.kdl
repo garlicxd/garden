@@ -1,0 +1,17 @@
+// Touchscreen-compatible gestures (also work with touchscreen drag-and-drop).
+gestures {
+    dnd-edge-view-scroll {
+        trigger-width 30
+        delay-ms 100
+        max-speed 1500
+    }
+    dnd-edge-workspace-switch {
+        trigger-height 50
+        delay-ms 100
+        max-speed 1500
+    }
+    // Top-left corner hot corner toggles overview.
+    hot-corners {
+        top-left
+    }
+}

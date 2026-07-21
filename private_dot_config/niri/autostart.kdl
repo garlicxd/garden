@@ -1,5 +1,4 @@
 // ────────────── Startup Applications ──────────────
-// Noctalia v5 — started directly (no longer via qs noctalia-shell)
 
 // Noctalia v5 — native compositor shell
 spawn-at-startup "noctalia"
@@ -7,4 +6,5 @@ spawn-at-startup "noctalia"
 // xdg-desktop-portal (needed for Secret portal / gnome-keyring integration)
 spawn-at-startup "start-portal.sh"
 
-
+// Export env to systemd/dbus so portal services can connect to Wayland
+spawn-at-startup "sh" "-c" "dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP"
