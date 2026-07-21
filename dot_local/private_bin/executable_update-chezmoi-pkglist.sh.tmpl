@@ -1,6 +1,8 @@
 #!/bin/bash
 # pacman.txt hash: {{ include "pkglists/pacman.txt" | sha256sum }}
 # aur.txt hash: {{ include "pkglists/aur.txt" | sha256sum }}
+# bun.txt hash: {{ include "pkglists/bun.txt" | sha256sum }}
+# uv.txt hash: {{ include "pkglists/uv.txt" | sha256sum }}
 
 if command -v pacman &> /dev/null; then
     sudo pacman -S --needed --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/pacman.txt
@@ -14,6 +16,16 @@ elif command -v yay &> /dev/null; then
     yay -S --needed --noconfirm - < {{ .chezmoi.sourceDir }}/pkglists/aur.txt
 fi
 
-if command -v bun &> /dev/null; then
-    bun add -g @earendil-works/pi-coding-agent
+if command -v bun &> /dev/null && [ -f "{{ .chezmoi.sourceDir }}/pkglists/bun.txt" ]; then
+    while IFS= read -r pkg; do
+        [ -z "$pkg" ] && continue
+        bun add -g "$pkg"
+    done < "{{ .chezmoi.sourceDir }}/pkglists/bun.txt"
+fi
+
+if command -v uv &> /dev/null && [ -f "{{ .chezmoi.sourceDir }}/pkglists/uv.txt" ]; then
+    while IFS= read -r pkg; do
+        [ -z "$pkg" ] && continue
+        uv tool install "$pkg"
+    done < "{{ .chezmoi.sourceDir }}/pkglists/uv.txt"
 fi

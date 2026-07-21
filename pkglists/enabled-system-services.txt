@@ -4,7 +4,6 @@ bluetooth.service
 disable-lid-wakeup.service
 dmemcg-booster-system.service
 docker.service
-getty@.service
 greetd.service
 intel_lpmd.service
 keyd.service
