@@ -5,24 +5,48 @@
 .pi/agent/extensions/auth.json
 .pi/agent/bin
 
-
-# Bun — track only package.json (package list), ignore lockfile + node_modules
+# Bun — track only package.json, ignore lockfile + node_modules
 .bun/install/global/node_modules
 .bun/install/global/bun.lock
 
-
-# Noctalia — ignore ephemeral state (cache, clipboard, history)
+# Noctalia — ignore ephemeral state, git repos, caches, and community download caches
 .local/state/noctalia/clipboard
-.local/state/noctalia/notification_history.json
+.local/state/noctalia/notification_history*
 .local/state/noctalia/recently_used.json
 .local/state/noctalia/usage_counts.json
-.local/state/noctalia/community-palettes
-.local/state/noctalia/community-templates
+.local/state/noctalia/plugin-cache
 .local/state/noctalia/.setup-complete
-.local/state/noctalia/plugins
+.local/state/noctalia/state.toml
+.local/state/noctalia/**/.git
+.local/state/noctalia/**/.git/**
+.local/state/noctalia/**/.noctalia-cache.json
+.local/state/noctalia/plugins/sources
 
-# Systemd unit files — reference copies tracked in repo, not applied to $HOME
-systemd-units/
+# Umbriel backups & old configs
+.config/umbriel/config.toml.bak-*
+.config/umbriel/old-keybinds.toml
 
-# Package lists — reference data tracked in repo, not applied to $HOME
-pkglists/
+# Kitty backups & leftovers
+.config/kitty/kitty.conf.backup.*
+.config/kitty/dank-*.conf
+
+# GTK leftovers
+.config/gtk-3.0/dank-colors.css
+.config/gtk-4.0/dank-colors.css
+.config/gtk-4.0/gtk.css.bak
+
+# Portal configs — exclude old niri portal
+.config/xdg-desktop-portal/niri-portals.conf
+
+# Local bin binaries
+.local/bin/uv
+.local/bin/uvx
+.local/bin/*.AppImage
+.local/bin/Creamlinux*
+.local/bin/colony
+.local/bin/stop-rag
+
+# Systemd user services — ignore old niri services
+.config/systemd/user/iio-niri.service
+.config/systemd/user/niri-iio-lock-applet.service
+.config/systemd/user/niri.service.wants

@@ -1,8 +1,8 @@
 {
-  "lastChangelogVersion": "0.81.1",
+  "lastChangelogVersion": "1.4.0",
   "theme": "noctalia",
   "defaultProvider": "deepseek",
-  "defaultModel": "deepseek-v4-flash",
+  "defaultModel": "deepseek-flash",
   "defaultThinkingLevel": "high",
   "extensions": [],
   "npmCommand": [
@@ -10,10 +10,17 @@
   ],
   "shellCommandPrefix": "export PATH=\"$HOME/.bun/bin:$PATH\"; alias node=bun; alias npm=bun; alias npx=bunx; alias pnpm=bun; alias yarn=bun; ",
   "packages": [
-    "npm:@alexanderfortin/pi-deepseek-usage",
-    "npm:pi-deepseek-search",
     "npm:@hypabolic/pi-hypa",
-    "npm:pi-lens"
+    "npm:pi-lens",
+    "npm:@alexanderfortin/pi-deepseek-usage",
+    {
+      "source": "npm:pi-deepseek-search",
+      "extensions": [
+        "-index.ts"
+      ]
+    },
+    "npm:@juicesharp/rpiv-web-tools",
+    "npm:pi-cache-optimizer"
   ],
   "compaction": {
     "enabled": true

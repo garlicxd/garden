@@ -1,3 +1,0 @@
-@earendil-works/pi-coding-agent
-@huggingface/hub
-@hypabolic/hypa

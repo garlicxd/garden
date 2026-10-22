@@ -1,0 +1,77 @@
+/**
+ * RAG Researcher - local RAG & search proxy tools
+ *
+ * Talks to the rag-proxy (FastAPI) on http://127.0.0.1:5000.
+ * Provides ranked web search (local RAG + live web, reranked) and
+ * crawl-and-index of pages into the local knowledge base.
+ */
+import { Type } from "@earendil-works/pi-ai";
+import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+const PROXY_URL = "http://127.0.0.1:5000";
+
+// Tool 1: ranked web search
+const rankedWebSearch = defineTool({
+	name: "ranked_web_search",
+	label: "Ranked Web Search",
+	description:
+		"Search the web using the local RAG proxy. Returns ranked and deduplicated results combining local RAG knowledge and live web search.",
+	parameters: Type.Object({
+		query: Type.String({ description: "Search query" }),
+	}),
+
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const resp = await fetch(`${PROXY_URL}/search`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ query: params.query }),
+		});
+		if (!resp.ok) {
+			throw new Error(`Search failed: ${resp.status} ${await resp.text()}`);
+		}
+		const data = await resp.json();
+		return {
+			content: [{ type: "text", text: JSON.stringify(data.results, null, 2) }],
+			details: { resultCount: data.results.length },
+		};
+	},
+});
+
+// Tool 2: crawl and index page
+const crawlAndIndexPage = defineTool({
+	name: "crawl_and_index_page",
+	label: "Crawl and Index Page",
+	description:
+		"Crawl a web page and index its content into the local RAG knowledge base for future searches.",
+	parameters: Type.Object({
+		urls: Type.Array(Type.String({ description: "URL to crawl" }), {
+			description: "List of URLs to crawl",
+		}),
+	}),
+
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const resp = await fetch(`${PROXY_URL}/crawl-and-index`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ urls: params.urls }),
+		});
+		if (!resp.ok) {
+			throw new Error(`Crawl/index failed: ${resp.status} ${await resp.text()}`);
+		}
+		const data = await resp.json();
+		return {
+			content: [
+				{
+					type: "text",
+					text: `Indexed ${data.indexed_chunks} chunks from the provided URLs.`,
+				},
+			],
+			details: data,
+		};
+	},
+});
+
+export default function (pi: ExtensionAPI) {
+	pi.registerTool(rankedWebSearch);
+	pi.registerTool(crawlAndIndexPage);
+}

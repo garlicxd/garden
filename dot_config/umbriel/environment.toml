@@ -1,0 +1,32 @@
+# Session environment
+# Native launcher sessions first load the user's supported login profile.
+# Values here override inherited values and are published to new systemd user
+# services. They apply only at session startup. Add or uncomment as needed.
+# Documentation: https://docs.noctalia.dev/umbriel/configuration/#environment
+
+[environment]
+PATH = "/home/garlic/.bun/bin:/home/garlic/.local/bin/pi:/home/garlic/.local/bin:/home/garlic/.pi/agent/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
+TERMINAL = "kitty"
+FILE_MANAGER = "nautilus"
+BROWSER = "brave-origin"
+MY_FONT_SIZE = "14"
+
+# --- Electron / Chromium (Brave, VSCode, Obsidian, etc.) ---
+OZONE_PLATFORM_HINT = "wayland"
+ELECTRON_OZONE_PLATFORM_HINT = "wayland"
+
+# --- Qt ---
+QT_QPA_PLATFORM = "wayland"
+# Choose your Qt theme tool: "qt6ct" (modern) or "qt5ct" (legacy)
+QT_QPA_PLATFORMTHEME = "qt6ct"
+QT_WAYLAND_DISABLE_WINDOWDECORATION = "1"
+
+# --- GTK ---
+GDK_BACKEND = "wayland"
+CLUTTER_BACKEND = "wayland"
+
+SDL_VIDEODRIVER = "wayland"
+
+# --- Cursor ---
+XCURSOR_THEME = "geared-brass-32x"
+XCURSOR_SIZE = "32"

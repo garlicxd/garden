@@ -3,7 +3,7 @@ name: umbriel-noctalia
 description: "Umbriel Wayland compositor + Noctalia v5+ shell. Look up docs, validate TOML before/after edits, prefer CLI/IPC over sockets. Triggers: umbriel, noctalia, wayland, compositor, desktop shell, toml, keybinds, actions, workspace, window rules, scratchpad, overlay, ipc, validate."
 metadata:
   triggers: umbriel, noctalia, wayland, compositor, desktop shell, toml, keybinds, actions, workspace, window rules, scratchpad, overlay, ipc, validate
-  last_verified: 2026-09-23
+  last_verified: 2026-10-16
 ---
 
 # Umbriel + Noctalia (v5+)
@@ -12,7 +12,7 @@ metadata:
 
 1. **Docs > memory.** Check the docs or `--help` before guessing a TOML key, action, or IPC command.
 2. **Validate after every config edit.**
-   - Umbriel: `umbriel validate` (or `umbriel validate -c PATH`) — works without a running session.
+   - Umbriel: `umbriel config validate` (or `umbriel config validate -c PATH`) — works without a running session. NOTE: bare `umbriel validate` is NOT a command (it prints usage); the stock `config.toml` comments still say it is.
    - Noctalia: `noctalia config validate` (optionally pass a path).
 3. **Use the CLIs, not the sockets.** `umbriel msg` / `noctalia msg`; don't talk to `$UMBRIEL_SOCKET` directly.
 
@@ -28,6 +28,7 @@ Umbriel
 - Overview: <https://docs.noctalia.dev/umbriel/>
 - Configuration: <https://docs.noctalia.dev/umbriel/configuration/>
 - Keybinds: <https://docs.noctalia.dev/umbriel/keybinds/>
+- Input (keyup, touchpad, touch/touchscreen, tablet, cursor): <https://docs.noctalia.dev/umbriel/input/>
 - Actions (all `msg` verbs): <https://docs.noctalia.dev/umbriel/actions/>
 - IPC (socket + event stream): <https://docs.noctalia.dev/umbriel/ipc/>
 
@@ -46,8 +47,8 @@ Noctalia
 Config: TOML under `~/.config/umbriel/` (`config.toml` plus includes); most changes live-reload on save, errors show on screen.
 
 ```bash
-umbriel validate              # validate default config
-umbriel validate -c PATH      # validate a specific file
+umbriel config validate              # validate default config
+umbriel config validate -c PATH      # validate a specific file
 umbriel msg ACTION            # run an action
 umbriel msg --help            # full grouped action list
 ```

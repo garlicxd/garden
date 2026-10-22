@@ -1,0 +1,468 @@
+/**
+ * Colony control + generate_text — auto-starts the local colony (qwen OVMS) on demand.
+ *
+ * colony_control tool: start/stop/unload/down/status for the OVMS container
+ *   (wraps the `colony` CLI at ~/.local/bin/colony → ~/Documents/colony/stop-colony.sh)
+ * generate_text tool:  chat completion against qwen; auto-starts colony if port 8000 is down.
+ *
+ * Output: plain-text summary (what the model sees); details carry the raw payloads.
+ */
+import { execFile } from "node:child_process";
+import { homedir } from "node:os";
+import { promisify } from "node:util";
+import { StringEnum, Type } from "@earendil-works/pi-ai";
+import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
+
+const execFileAsync = promisify(execFile);
+
+const COLONY_BIN = `${homedir()}/.local/bin/colony`;
+const COMPOSE_DIR = process.env.COLONY_DIR ?? `${homedir()}/Documents/colony`;
+const OVMS_BASE = "http://127.0.0.1:8000"; // colony OVMS REST port
+const OVMS_URL = `${OVMS_BASE}/v3`; // OpenAI-compatible endpoint
+
+const ACTIONS = ["start", "stop", "unload", "down", "status"] as const;
+type Action = (typeof ACTIONS)[number];
+
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
+
+async function runColony(
+	args: string[],
+): Promise<{ out: string; ok: boolean }> {
+	try {
+		const { stdout, stderr } = await execFileAsync(COLONY_BIN, args, {
+			timeout: 300_000,
+			env: { ...process.env, COLONY_DIR: COMPOSE_DIR },
+		});
+		return { out: `${stdout}\n${stderr}`.trim(), ok: true };
+	} catch (err: any) {
+		return {
+			out: `colony ${args.join(" ")} failed: ${err?.message ?? String(err)}`,
+			ok: false,
+		};
+	}
+}
+
+async function ovmsServables(): Promise<{ name: string; status: string }[]> {
+	// The OpenAI-style /v3/models lists servables but omits load state on this
+	// OVMS build; the native /v1/config carries the real state (AVAILABLE/LOADING).
+	let ids: string[] = [];
+	try {
+		const resp = await fetch(`${OVMS_URL}/models`);
+		if (resp.ok) {
+			const data: any = await resp.json();
+			ids = (data?.data ?? []).map((m: any) => String(m?.id ?? m?.name ?? "?"));
+		}
+	} catch {
+		// fall through — /v1/config below may still answer
+	}
+	const states = new Map<string, string>();
+	try {
+		const resp = await fetch(`${OVMS_BASE}/v1/config`);
+		if (resp.ok) {
+			const cfg: any = await resp.json();
+			for (const [name, info] of Object.entries<any>(cfg)) {
+				const st = info?.model_version_status?.[0]?.state ?? "";
+				states.set(name, st === "AVAILABLE" ? "READY" : st || "?");
+			}
+		}
+	} catch {
+		// no native state — presence in /v3/models implies loaded
+	}
+	if (!ids.length) {
+		ids = Array.from(states.keys());
+	}
+	return ids.map((name) => ({ name, status: states.get(name) ?? "READY" }));
+}
+
+async function composePs(): Promise<string> {
+	try {
+		const { stdout } = await execFileAsync(
+			"docker",
+			["compose", "-f", `${COMPOSE_DIR}/docker-compose.yml`, "ps"],
+			{ timeout: 30_000 },
+		);
+		return stdout.trim();
+	} catch {
+		return "(compose ps unavailable)";
+	}
+}
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((r) => setTimeout(r, ms));
+}
+
+const qwenReady = (s: { name: string; status: string }): boolean =>
+	s.name === "qwen" && s.status === "READY";
+
+/**
+ * Ensure colony is running and qwen is READY before sending a prompt.
+ * Fast path: OVMS already reports qwen READY. Otherwise start the container
+ * and poll up to ~6 minutes (36 × 10s) for the servable to finish loading.
+ */
+async function ensureColonyRunning(
+	signal?: AbortSignal,
+): Promise<{ ok: boolean; message: string }> {
+	let servables = await ovmsServables();
+	if (servables.some(qwenReady)) {
+		return { ok: true, message: "qwen already READY" };
+	}
+
+	// Colony script is idempotent: --start on a running project just says "already running".
+	const startResult = await runColony(["--start"]);
+	if (!startResult.ok) {
+		return {
+			ok: false,
+			message: `Failed to start colony:\n${startResult.out}`,
+		};
+	}
+
+	const maxTries = 36;
+	let tries = 0;
+	while (tries < maxTries && !servables.some(qwenReady)) {
+		if (signal?.aborted) {
+			return { ok: false, message: "Aborted while waiting for qwen to load." };
+		}
+		await sleep(10_000);
+		servables = await ovmsServables();
+		tries++;
+	}
+
+	if (servables.some(qwenReady)) {
+		return {
+			ok: true,
+			message: `Colony started; qwen READY after ~${tries * 10}s.`,
+		};
+	}
+	const reported = servables.length
+		? servables.map((s) => `${s.name}:${s.status}`).join(", ")
+		: "no servables";
+	return {
+		ok: false,
+		message:
+			`Colony started but qwen not READY after ~${maxTries * 10}s.\n` +
+			`OVMS reports: ${reported}\n` +
+			`Check: docker logs colony`,
+	};
+}
+
+let ensureInFlight: Promise<{ ok: boolean; message: string }> | null = null;
+/** Dedupe concurrent readiness checks (session_start + before_agent_start + commands). */
+function ensureColonyRunningDeduped(signal?: AbortSignal) {
+	if (!ensureInFlight) {
+		ensureInFlight = ensureColonyRunning(signal).finally(() => {
+			ensureInFlight = null;
+		});
+	}
+	return ensureInFlight;
+}
+
+// Shared core for the colony_control tool and the /colony command.
+async function runAction(action: Action): Promise<string> {
+	switch (action) {
+		case "start": {
+			const { out } = await runColony(["--start"]);
+			let servables = await ovmsServables();
+			let tries = 0;
+			while (tries < 6 && !servables.some(qwenReady)) {
+				await sleep(10_000);
+				servables = await ovmsServables();
+				tries++;
+			}
+			const qwen = servables.find((s) => s.name === "qwen");
+			const all = servables.length
+				? servables.map((s) => `${s.name}:${s.status}`).join(", ")
+				: "none yet";
+			return qwen?.status === "READY"
+				? `${out}\n\n✓ qwen is READY (${all})`
+				: `${out}\n\nqwen not ready yet (${all}). Full load takes ~2–5 min — call colony_control again with action=status to check.`;
+		}
+		case "stop":
+		case "unload":
+		case "down":
+			return (await runColony([`--${action}`])).out;
+		case "status": {
+			const ps = await composePs();
+			const servables = await ovmsServables();
+			const lines = [ps, ""];
+			if (servables.length) {
+				lines.push("OVMS servables:");
+				for (const s of servables) lines.push(`  ${s.name}: ${s.status}`);
+			} else {
+				lines.push("OVMS not responding (container down or still starting).");
+			}
+			return lines.join("\n");
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// colony_control tool
+// ---------------------------------------------------------------------------
+
+const colonyControl = defineTool({
+	name: "colony_control",
+	label: "Colony Control (local qwen)",
+	description:
+		"Start/stop/status the local colony container — the OVMS server on the iGPU that serves the qwen LLM " +
+		"(OpenAI-compatible at http://127.0.0.1:8000/v3, wired into pi as provider colony-ovms, model id 'qwen'). " +
+		"start brings the container up (docker compose up -d) and confirms the qwen servable is READY; " +
+		"unload/stop/down mirror the colony script's flags (unload = compose stop, stop = rm -s, down = full teardown); " +
+		"status reports what OVMS is currently serving. " +
+		"Note: generate_text auto-starts colony if needed, so you rarely need to call this manually.",
+	promptSnippet: "Start, stop, or check the local colony (qwen LLM server)",
+	promptGuidelines: [
+		"Use colony_control when the user explicitly asks to start, stop, or check the local qwen/colony model server.",
+		"After colony_control start, qwen takes 2–5 minutes to load on a cold start — poll with colony_control status rather than assuming it is ready.",
+	],
+	parameters: Type.Object({
+		action: StringEnum(ACTIONS),
+	}),
+	async execute(_toolCallId, params) {
+		const text = await runAction(params.action);
+		return {
+			content: [{ type: "text", text }],
+			details: { action: params.action },
+		};
+	},
+	renderResult: (result, _opts) => {
+		const text = (result.content?.[0] as any)?.text ?? "no output";
+		return new Text(String(text), 0, 0);
+	},
+});
+
+// ---------------------------------------------------------------------------
+// generate_text tool — auto-starts colony if down
+// ---------------------------------------------------------------------------
+
+const generateText = defineTool({
+	name: "generate_text",
+	label: "Generate Text (local qwen)",
+	description:
+		"Generate a response using the local qwen LLM — Qwen3.8 27B-int4 served by OVMS colony on the iGPU " +
+		"(OpenAI-compatible at http://127.0.0.1:8000/v3, wired into pi as provider colony-ovms, model id 'qwen'). " +
+		"Automatically starts colony (docker compose up -d) if the server is down, then waits for qwen to finish loading. " +
+		"Supports optional OpenAI-style tool definitions (agentic) and base64 image input (VLM). " +
+		"Best for cheap local reasoning/rewrites; iGPU throughput is limited, so keep max_tokens modest.",
+	promptSnippet: "Generate a response using the local qwen LLM (colony OVMS)",
+	promptGuidelines: [
+		"Use generate_text for requests that need the local qwen LLM: coding, reasoning, analysis, creative writing, etc.",
+		"generate_text auto-starts colony if it is down, so you do not need to call colony_control first — but the first call after a cold stop can take 2–5 minutes while qwen loads.",
+		"If the user wants to explicitly free RAM by stopping the server, use colony_control with action=stop or down.",
+	],
+	parameters: Type.Object({
+		prompt: Type.String({ description: "The user's prompt/question." }),
+		system_prompt: Type.Optional(
+			Type.String({
+				description:
+					"System prompt. Default: 'You are a helpful coding assistant.'",
+			}),
+		),
+		max_tokens: Type.Optional(
+			Type.Number({
+				description:
+					"Max output tokens (default 1024; the iGPU is slow, keep small).",
+			}),
+		),
+		temperature: Type.Optional(
+			Type.Number({ description: "Sampling temperature (default 0.7)." }),
+		),
+		tools: Type.Optional(
+			Type.Array(Type.Any(), {
+				description: "OpenAI-style tool definitions for agentic use.",
+			}),
+		),
+		image_url: Type.Optional(
+			Type.String({
+				description: "Optional base64 data URL for VLM image input.",
+			}),
+		),
+	}),
+	async execute(_toolCallId, params, signal) {
+		// ── Auto-start colony if needed ──
+		const readiness = await ensureColonyRunning(signal);
+		if (!readiness.ok) {
+			return {
+				content: [
+					{
+						type: "text",
+						text: `Colony could not be started:\n${readiness.message}`,
+					},
+				],
+				details: { colonyStartFailed: true },
+			};
+		}
+		if (signal?.aborted) {
+			return {
+				content: [{ type: "text", text: "Aborted." }],
+				details: { aborted: true },
+			};
+		}
+
+		// ── Build request ──
+		const content: any[] = [{ type: "text", text: params.prompt }];
+		if (params.image_url) {
+			content.push({ type: "image_url", image_url: { url: params.image_url } });
+		}
+		const body: any = {
+			model: "qwen",
+			messages: [
+				{
+					role: "system",
+					content:
+						params.system_prompt ?? "You are a helpful coding assistant.",
+				},
+				{ role: "user", content: params.image_url ? content : params.prompt },
+			],
+			max_tokens: params.max_tokens ?? 1024,
+			temperature: params.temperature ?? 0.7,
+			stream: false,
+		};
+		if (params.tools && params.tools.length > 0) {
+			body.tools = params.tools;
+		}
+
+		// ── Send ──
+		try {
+			const response = await fetch(`${OVMS_URL}/chat/completions`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+				signal,
+			});
+			if (!response.ok) {
+				const errorText = await response.text();
+				throw new Error(`OVMS error ${response.status}: ${errorText}`);
+			}
+
+			const data: any = await response.json();
+			const msg = data?.choices?.[0]?.message ?? {};
+			const text = msg.content ?? "";
+			const toolCalls = msg.tool_calls ?? [];
+			const out = [
+				typeof text === "string" && text ? text : null,
+				toolCalls.length ? `tool_calls: ${JSON.stringify(toolCalls)}` : null,
+			]
+				.filter(Boolean)
+				.join("\n\n");
+			return {
+				content: [{ type: "text", text: out || "no response generated" }],
+				details: {
+					message: msg,
+					usage: data?.usage,
+					colony_ready_message: readiness.message,
+				},
+			};
+		} catch (error: any) {
+			return {
+				content: [
+					{
+						type: "text",
+						text: `Error calling Qwen model: ${error?.message ?? error}`,
+					},
+				],
+				details: { error: true },
+			};
+		}
+	},
+	renderResult: (result, _opts, theme) => {
+		const msg = (result.details as any)?.message ?? {};
+		const text = msg.content ?? "";
+		const reasoning = msg.reasoning_content ?? "";
+		const lines: string[] = [];
+		if (typeof text === "string" && text) lines.push(text);
+		if (reasoning) {
+			lines.push(
+				theme?.fg?.(
+					"muted",
+					`⟳ ${reasoning.slice(0, 200)}${reasoning.length > 200 ? "…" : ""}`,
+				) ?? `⟳ ${reasoning.slice(0, 200)}${reasoning.length > 200 ? "…" : ""}`,
+			);
+		}
+		return new Text(lines.length ? lines.join("\n\n") : "no response", 0, 0);
+	},
+});
+
+// ---------------------------------------------------------------------------
+// export
+// ---------------------------------------------------------------------------
+
+export default function (pi: ExtensionAPI) {
+	pi.registerTool(colonyControl);
+	pi.registerTool(generateText);
+
+	console.log(
+		"[colony] extension loaded: session_start + before_agent_start hooks active",
+	);
+
+	// Kick off colony loading as soon as a session opens (non-blocking).
+	pi.on("session_start", (_event, ctx) => {
+		void (async () => {
+			try {
+				const servables = await ovmsServables();
+				if (servables.some(qwenReady)) return;
+				ctx.ui.notify(
+					"Colony is down — auto-starting qwen (2–5 min load)…",
+					"info",
+				);
+				const r = await ensureColonyRunningDeduped();
+				ctx.ui.notify(
+					r.ok ? `✓ ${r.message}` : `✗ Colony start failed: ${r.message}`,
+					r.ok ? "success" : "error",
+				);
+			} catch (err) {
+				console.error("[colony] session_start auto-start failed:", err);
+			}
+		})();
+	});
+
+	// Gate the first prompt: block before the agent loop so the main model call
+	// never hits a dead server. Warm sessions return instantly.
+	pi.on("before_agent_start", async (_event, ctx) => {
+		try {
+			const servables = await ovmsServables();
+			if (servables.some(qwenReady)) return;
+			ctx.ui.notify(
+				"Colony is down — starting qwen before sending this prompt…",
+				"info",
+			);
+			const r = await ensureColonyRunningDeduped();
+			ctx.ui.notify(
+				r.ok ? `✓ ${r.message}` : `✗ ${r.message}`,
+				r.ok ? "success" : "error",
+			);
+		} catch (err) {
+			console.error("[colony] before_agent_start auto-start failed:", err);
+		}
+	});
+
+	pi.registerCommand("colony", {
+		description: `Control the local colony (qwen OVMS): ${ACTIONS.join("|")}`,
+		handler: async (args, ctx) => {
+			const action = (args ?? "").trim() as Action;
+			if (!(ACTIONS as readonly string[]).includes(action)) {
+				ctx.ui.notify(`Usage: /colony ${ACTIONS.join("|")}`, "error");
+				return;
+			}
+			const text = await runAction(action);
+			ctx.ui.notify(
+				text.length > 2000 ? `${text.slice(0, 2000)}…` : text,
+				"info",
+			);
+		},
+	});
+
+	pi.registerCommand("colony-start", {
+		description: "Start colony and wait for qwen to become READY",
+		handler: async (_args, ctx) => {
+			ctx.ui.notify("Starting colony…", "info");
+			const r = await ensureColonyRunningDeduped();
+			ctx.ui.notify(
+				r.ok ? `✓ ${r.message}` : `✗ ${r.message}`,
+				r.ok ? "success" : "error",
+			);
+		},
+	});
+}

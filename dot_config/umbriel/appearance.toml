@@ -1,0 +1,156 @@
+# ─────────────────────────────── Colors ─────────────────────────────────────
+# Configure every color Umbriel paints. Values stay commented so an included
+# Noctalia-generated palette can supply them without this main file winning.
+# Documentation: https://docs.noctalia.dev/umbriel/appearance/#colors
+# ────────────────────────────────────────────────────────────────────────────
+
+[colors]
+# background = "#141419FF"                      # Umbriel panels and banners
+# text_primary = "#E8E8EAFF"                    # Primary text
+# text_muted = "#8A8A92FF"                      # Secondary help and status text
+# accent_primary = "#7AA3FFFF"                  # Titles, key chords, and primary emphasis
+# accent_secondary = "#F5C96BFF"                # Group headings and secondary emphasis
+# warning = "#F5C96BFF"                         # Warning text and warning-only diagnostics
+# error = "#FF6B6BFF"                           # Error text, confirmations, and diagnostics
+# insert_hint = "#7FC8FF80"                     # Drag-and-drop target preview
+# backdrop = "#000000FF"                        # Fullscreen gaps and lock screen
+shadow = "#362c1fFF"                          # Window shadow
+
+# [colors.border]
+# focused = "#7AA3FFFF"                         # Focused window border
+# unfocused = "#292933FF"                       # Unfocused window border
+# scratchpad_focused = "#E5C07BFF"              # Focused scratchpad border
+# scratchpad_unfocused = "#5C4A2AFF"            # Unfocused scratchpad border
+# outer = "#1A1A1FFF"                           # Outer border ring
+
+# [colors.overview]
+# background_tint = "#10101430"                 # Tint over the desktop background
+# workspace_background = "#00000044"            # Background behind each workspace
+# badge = "#7AA3FFFF"                           # Overview shortcut badge
+
+# ───────────────────────────── Appearance ───────────────────────────────────
+# Configure window decoration geometry, blur, shadows, and other visual
+# effects.
+# Documentation: https://docs.noctalia.dev/umbriel/appearance/#window-appearance
+# ────────────────────────────────────────────────────────────────────────────
+
+[appearance]
+prefer_no_csd = true   # Prefer Umbriel's border-only decoration
+border_width = 2       # Inner border width, 0-100 logical pixels
+outer_border_width = 0 # Optional outer ring, 0-100 logical pixels
+corner_radius = 1     # Radius of the final decorated edge, 0-100
+drag_opacity = 0.75    # Window opacity during a tiled or floating drag
+
+[appearance.blur]
+# Matching window and layer rules choose which surfaces are blurred.
+enabled = true   # Master blur switch
+optimized = true # Blur the background instead of overlapping windows
+passes = 3       # Blur passes, 0-8
+radius = 3       # Blur radius, 0-100
+noise = 0.02     # Noise overlay, 0.0-1.0
+brightness = 0.9 # 0.0-2.0
+contrast = 0.9   # 0.0-2.0
+saturation = 1.1 # 0.0-2.0
+
+[appearance.shadow]
+# Shadows follow custom window shader shapes and remain visible while windows
+# close.
+enabled = true # Draw shadows behind non-fullscreen windows
+softness = 1   # Gaussian softness, 0-200; 0 is a hard (square-cornered) edge
+# 1+ enters the blurred path so the shadow rounds with corner_radius
+offset_x = 10 # Horizontal offset, -200 to 200
+offset_y = 10 # Vertical offset, -200 to 200
+
+
+# ────────────────────────────── Animation ───────────────────────────────────
+# Parent values provide defaults for every event table. Nested values override
+# only that event. Disable one event to make just that transition instant.
+# Documentation: https://docs.noctalia.dev/umbriel/animation/
+# Every event accepts shader = "path/to/effect.glsl". Inline GLSL is not supported.
+# File paths are relative to this config, including configs loaded via include.
+# Bundled reveal.glsl and squash.glsl can be referenced by their installed absolute paths.
+# Copy examples/shaders beside your config only if you want editable local versions.
+# ────────────────────────────────────────────────────────────────────────────
+
+[animation]
+enabled = true    # Master animation switch
+duration_ms = 300 # Shared duration, 1-10000 ms
+curve = "easeout" # Built-in or registered bezier/spring curve name
+
+# Window opening animation
+[animation.windows_in]
+enabled = true
+duration_ms = 300
+curve = "easeout"
+style = "popin"   # popin, zoom, slide, fade, or none
+scale = 0.85      # Popin start scale, 0.1-1.0
+# shader = "shaders/reveal.glsl"      # Replaces the built-in opening style
+
+# Window closing animation
+[animation.windows_out]
+enabled = true
+duration_ms = 300
+curve = "easeout"
+style = "fade"    # fade or slide
+# shader = "shaders/reveal.glsl"
+
+# Window movement, resizing, layout changes, maximize and restore, and visible
+# scratchpad resizing
+[animation.windows_move]
+enabled = true
+duration_ms = 600
+curve = "easeout"
+# shader = "shaders/squash.glsl"      # Subtle compression and settle during move/resize
+
+# Workspace switching
+[animation.workspaces]
+enabled = true
+duration_ms = 400
+curve = "easeout"
+
+# Entering and leaving overview
+[animation.overview]
+enabled = true
+duration_ms = 300
+curve = "easeout"
+# Filmstrip movement from wheel, keyboard, and touchpad navigation
+workspace_curve = "spring:1,1000"
+
+# Scratchpad show, hide, and backdrop
+[animation.scratchpad]
+enabled = false
+duration_ms = 250
+curve = "easeout"
+dim = 0.5          # Backdrop dim amount, 0.0-1.0
+blur = false       # Requires appearance.blur.enabled
+scale = 0.0        # 0 keeps geometry; 0.1-1.0 centers and scales
+maximize = false   # Maximize to usable-area edges while shown
+fullscreen = false # Make the scratchpad window fullscreen while shown
+
+# Focus border color
+[animation.border]
+enabled = true
+duration_ms = 250
+curve = "easeout"
+
+# Unfocused window opacity
+[animation.dim_unfocused]
+enabled = true
+duration_ms = 250
+curve = "easeout"
+dim = 0.2         # 0 disables dimming; maximum is 1.0
+
+# Layer-shell surface mapping and unmapping
+[animation.layers]
+enabled = false
+duration_ms = 250
+curve = "easeout"
+
+# Register reusable curves by adding or uncommenting entries below.
+# Documentation: https://docs.noctalia.dev/umbriel/animation/#curves
+
+[animation.beziers]
+# myBezier = [0.05, 0.9, 0.1, 1.0]
+
+[animation.springs]
+# myBounce = { damping = 0.5, stiffness = 200 }

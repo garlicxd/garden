@@ -1,0 +1,178 @@
+# ───────────────────────────── Window Rules ─────────────────────────────────
+# Match windows by application ID, title, XDG tag, content type, or focus state.
+# Opening settings apply once; effects and output policies update while mapped.
+# Documentation: https://docs.noctalia.dev/umbriel/window-rules/
+# ────────────────────────────────────────────────────────────────────────────
+
+# Blur every window. Keep this selectorless rule first so later matching rules
+# can override individual blur settings.
+[[window_rule]]
+blur = true
+blur_optimized = false
+
+# Noctalia settings
+[[window_rule]]
+match.app_id = "^dev.noctalia.Noctalia$"
+default_floating = true
+default_floating_size_px = { width = 1020, height = 900 }
+default_focused = true
+
+# Noctalia share picker
+[[window_rule]]
+match.app_id = "^dev.noctalia.UmbrielSharePicker$"
+default_floating = true
+default_floating_size_px = { width = 800, height = 600 }
+
+# Optional positional placement recipe. Output names follow the same rules as
+# [output.*]. `default_output` scopes the workspace lookup to that output, and
+# integer workspace selectors are 1-based positions.
+
+# [[window_rule]]
+# match.app_id = "^org[.]example[.]Editor$"
+# default_output = "DP-1"
+# default_workspace = 2
+# default_focused = false
+
+# A string workspace selector is an exact, case-sensitive name, so `"2"`
+# selects the workspace named `"2"` instead of position 2. The workspace can
+# come from a static name list or a name-based [[workspace]] entry on a dynamic
+# output. The window rule itself never creates a workspace.
+
+# [[window_rule]]
+# match.app_id = "^org[.]example[.]Chat$"
+# default_output = "DP-1"
+# default_workspace = "CHAT"
+# default_focused = false
+
+# Store a dedicated terminal in the named `terminal` scratchpad. Enable its
+# [[scratchpad]] definition above, then launch
+# `foot --app-id scratchpad-terminal`. The output and workspace remain
+# its restore destination.
+
+# [[window_rule]]
+# match.app_id = "^scratchpad-terminal$"
+# default_scratchpad = "terminal"
+# default_output = "DP-1"
+# default_workspace = 2
+# default_floating = true
+# default_floating_size = { width = 0.6, height = 0.5 }
+# default_position = { x = 0, y = 8, anchor = "top" }
+
+# [[window_rule]]
+# match.app_id = "^example-app$"
+# default_maximize = true
+
+# Open an application maximized to usable-area edges, without gaps or borders.
+
+# [[window_rule]]
+# match.app_id = "^discord$"
+# default_maximize_to_edges = true
+
+# Match a standardized surface content hint.
+
+# [[window_rule]]
+# match.content_type = "game"
+# vrr = "always"
+
+# Match a client-defined XDG toplevel tag, such as Proton-EM's game tag.
+
+# [[window_rule]]
+# match.xdg_tag = "^proton-game$"
+# default_fullscreen = true
+
+# Start matching windows in a 1200-pixel scrolling column.
+
+# [[window_rule]]
+# match.app_id = "^org[.]example[.]Wide$"
+# default_scrolling_extent_px = 1200
+
+# Size a floating window as fractions of the usable area.
+
+# [[window_rule]]
+# match.app_id = "^org[.]example[.]Utility$"
+# default_floating = true
+# default_floating_size = { width = 0.5, height = 0.6 }
+
+# Dynamic effects and output policies can be combined in one matching rule.
+
+# [[window_rule]]
+# match.app_id = "^firefox$"
+# match.title = "^Library$"
+# default_floating = true
+# default_focused = false
+# focus_on_activate = true
+# opacity = 0.95
+# blur_popups = true
+# blur_ignore_alpha = 0.1
+# vrr = "always"
+# tearing = true
+# hdr = "fullscreen"
+
+# Keep related tiled windows in one named scrolling column. Lower orders appear
+# higher in horizontal scrolling and farther left in vertical scrolling.
+
+# [[window_rule]]
+# match.app_id = "^firefox$"
+# default_scrolling_column = "browsers"
+# default_scrolling_column_order = 10
+
+# State-aware rules update as focus, floating, pinned, and scratchpad state
+# change. Pinned and scratchpad windows are floating too.
+
+# [[window_rule]]
+# match.is_focused = false
+# opacity = 0.85
+
+# [[window_rule]]
+# match.is_focused = true
+# opacity = 1.0
+
+# [[window_rule]]
+# match.is_floating = true
+# match.is_scratchpad = false
+# blur = false
+
+# Fill the viewport for a workspace's lone tiled column.
+# [[window_rule]]
+# match.is_alone = true
+# default_maximize = true
+
+# 75% width when the window is alone, the default width when another window opens.
+# [[window_rule]]
+# match.is_alone = true
+# default_scrolling_extent = 0.75
+
+# ────────────────────────────── Layer Rules ─────────────────────────────────
+# Match layer-shell surfaces such as panels, launchers, notifications, and
+# desktop widgets by namespace. Run `umbriel layers` to inspect live names.
+# Documentation: https://docs.noctalia.dev/umbriel/layer-rules/
+# ────────────────────────────────────────────────────────────────────────────
+
+[[layer_rule]]
+match.namespace = "^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd|desktop-widget-[^\"]*)$"
+blur = true
+blur_ignore_alpha = 0.5
+blur_popups = true
+blur_optimized = false
+
+# Steam: Float child windows, exclude main Steam client window
+[[window_rule]]
+match.app_id = "^steam$"
+match.title = "^(?!([Ss]team)$).*"
+default_floating = true
+
+# Brave Picture-in-Picture
+[[window_rule]]
+match.app_id = "^brave-origin$"
+match.title = "^Picture[- ]?in[- ]?[Pp]icture$"
+default_floating = true
+default_focused = false
+default_position = { x = 10, y = 10, anchor = "bottom_right" }
+
+# Steam Toasts
+[[window_rule]]
+match.app_id = "^steam$"
+match.title = "^notificationtoasts_\\d+_desktop$"
+default_floating = true
+default_focused = false
+default_position = { x = 10, y = 10, anchor = "bottom_right" }

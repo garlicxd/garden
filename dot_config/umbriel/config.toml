@@ -1,0 +1,211 @@
+# Umbriel example configuration
+
+# Distribution packages normally install this file as
+# /usr/share/umbriel/config.toml. Copy it to ~/.config/umbriel/config.toml
+# before making personal changes. Creating the user file and saving later edits
+# both apply live, so a logout is not needed.
+
+# Validate the standard config without starting or disturbing the compositor:
+#   umbriel validate
+# Use `-c` for a custom config path:
+#   umbriel validate -c /path/to/config.toml
+
+# Complete documentation: https://docs.noctalia.dev/umbriel/
+
+# ─────────────────────────────── Includes ───────────────────────────────────
+# Split large configurations into smaller files. Required files are applied in
+# list order, followed by optional files, then values in this main file.
+# Missing optional files are silently ignored and remain watched. Relative
+# paths start from the directory containing this file. Rule lists such as
+# [[window_rule]] collect entries from every file; any other value is replaced
+# by the last file that sets it.
+# Documentation: https://docs.noctalia.dev/umbriel/configuration/#include
+# ────────────────────────────────────────────────────────────────────────────
+
+[include]
+files = [
+    "appearance.toml" ,
+    "keybinds.toml",
+    "inputs.toml",
+    "outputs.toml",
+    "rules.toml",
+    "environment.toml",
+    ]                                      # Example: ["appearance.toml", "outputs.toml"]
+
+[include.optional]
+files = ["noctalia.toml"] # Example: ["~/.config/umbriel/noctalia.toml"]
+
+# ─────────────────────────────── General ────────────────────────────────────
+# Configure startup commands, session behavior, environment variables, and
+# hardware events.
+# Documentation: https://docs.noctalia.dev/umbriel/configuration/#general
+# ────────────────────────────────────────────────────────────────────────────
+
+[general]
+autostart = [ # Commands run once when the session starts
+    "noctalia",
+    "kitty",
+    "gsettings set org.gnome.desktop.interface cursor-theme 'geared-brass-64x'",
+    "gsettings set org.gnome.desktop.interface cursor-size 24"
+]
+# mod_key = "Super"                             # Force Super instead of nested-session Alt
+xwayland = true                                 # Requires xwayland-satellite; restart to change
+show_cheatsheet = true                          # Show the keybind overlay on startup
+focus_on_activate = false                       # Do not let unsolicited requests steal focus
+honor_restored_maximize = false                 # Honor restored maximized state
+
+# Native GPU exclusions
+# Changes require a restart. Use a PCI address if the GPU may start bound to vfio-pci.
+# Device paths must resolve at startup or Umbriel refuses to start.
+# Documentation: https://docs.noctalia.dev/umbriel/configuration/#drm-devices
+# [drm]
+# ignored_devices = ["/dev/dri/by-path/pci-0000:01:00.0-card"]
+# ignored_pci_addresses = ["0000:01:00.0"]
+
+# Hardware events
+# These commands run when a laptop lid opens or closes. Uncomment either hook
+# to enable it.
+# Documentation: https://docs.noctalia.dev/umbriel/configuration/#events
+
+[events]
+lid_close = "$HOME/.local/bin/lid-dpms close"
+lid_open  = "$HOME/.local/bin/lid-dpms open"
+
+# ────────────────────────────── Workspaces ──────────────────────────────────
+# Choose global workspace behavior. Each output uses dynamic workspaces unless
+# its output section defines a static count or list of names.
+# Documentation: https://docs.noctalia.dev/umbriel/workspaces/
+# ────────────────────────────────────────────────────────────────────────────
+
+[workspaces]
+# Each output supports at most 64 workspaces, including empty ones.
+back_and_forth = false                          # Re-select active workspace to switch back
+empty_above = false                             # Keep one empty workspace above active range
+
+# Workspace entries customize layout. An `index` follows the current position
+# without creating a workspace. A `name` also materializes a persistent named
+# member on matching dynamic outputs. On a static output, the rule applies only
+# when that inventory already has the selected member. Select exactly one, and
+# optionally scope by `output`.
+# Documentation: https://docs.noctalia.dev/umbriel/workspaces/#workspace-rules
+
+# [[workspace]]
+# index = 2
+# output = "DP-1"
+# layout.mode = "dwindle"
+# layout.gap = 4
+# layout.struts.top = 24
+# layout.scrolling.center_underfull_strip = false
+# layout.dwindle.preserve_split = true
+
+# Without `output`, every dynamic output gets its own case-sensitive CHAT
+# workspace. Add `output = "DP-1"` to materialize it only there. A numeric
+# string such as name = "2" remains distinct from index = 2.
+
+# [[workspace]]
+# name = "CHAT"
+# layout.mode = "master"
+
+
+# ────────────────────────────── Scratchpads ─────────────────────────────────
+# With no entries below, Umbriel creates one implicit scratchpad named
+# `default`, and bare scratchpad actions select it. Defining any named
+# scratchpad disables that implicit default and requires a name suffix on every
+# scratchpad action. Names must be unique, and `default` is reserved.
+# Documentation: https://docs.noctalia.dev/umbriel/scratchpads/
+# ────────────────────────────────────────────────────────────────────────────
+
+# [[scratchpad]]
+# name = "terminal"
+
+# [[scratchpad]]
+# name = "music"
+
+# A `default_scratchpad` window rule can store new matching windows
+# automatically. Use "default" while the definitions above remain commented,
+# or an exact configured name after enabling named mode.
+
+# ─────────────────────────────── Layout ─────────────────────────────────────
+# Configure the default tiling mode and shared sizing behavior. Workspace rules
+# above can override these values for individual workspaces.
+# Documentation: https://docs.noctalia.dev/umbriel/layout/
+# ────────────────────────────────────────────────────────────────────────────
+
+[layout]
+mode = "scrolling"                              # scrolling, dwindle, or master
+gap = 8                                         # Logical pixels between tiles, 0-500
+extent_presets = [0.333, 0.5, 0.667]             # Primary and secondary extent fractions
+
+[layout.struts]
+# Signed logical pixels reserved after panel exclusive zones. Negative values
+# expand the tiled area beyond that edge.
+left = 10                                        # -65535 to 65535
+right = 10
+top = 0
+bottom = 6
+
+[layout.scrolling]
+# The strip axis is perpendicular to the output's workspace_axis.
+default_extent_fraction = 0.5                   # Initial extent for new columns, 0.1-1.0
+center_underfull_strip = true                   # Center a strip narrower than the viewport
+center_focused = "never"                        # never, always, or on_overflow
+
+[layout.dwindle]
+# preserve_split = false                        # Keep every split direction fixed after creation                   # Exits fullscreen when a new window is opened in the workspace
+
+[layout.master]
+position = "left"                               # left, right, or center master area
+default_width_fraction = 0.55                   # Initial master area fraction, 0.1-0.9
+new_on_top = true                               # Put new windows at the top of the stack
+new_becomes_master = false                      # New windows take the master slot
+
+# ─────────────────────── Overview and Hot Corners ───────────────────────────
+# Configure the all-workspaces overview and pointer-triggered corner actions.
+# Overview: https://docs.noctalia.dev/umbriel/workspaces-overview/
+# Hot corners: https://docs.noctalia.dev/umbriel/keybinds/#hot-corners
+# Corners pause only while the keyboard-focused window on their output is fullscreen.
+# ────────────────────────────────────────────────────────────────────────────
+
+[overview]
+zoom = 0.5                                      # Workspace scale in overview, 0.1-0.75
+scroll_factor_horizontal = 1.0                  # Overview gesture/wheel multiplier, left and right, 0.1-10.0
+scroll_factor_vertical = 1.0                    # Overview gesture/wheel multiplier, up and down, 0.1-10.0
+# Pinned windows stay hidden until overview closes; visible scratchpads are dismissed.
+# background_blur = true                        # Blur the wallpaper behind overview rows
+# workspace_wallpaper = true                    # Mirror wallpapers inside workspace previews
+# shortcuts = true                              # Show keyboard shortcut badges on windows
+# shortcut_keys = "1234567890"                  # Badge keys in preference order
+
+[hot_corners.top_left]
+enabled = true                                  # Open the overview after resting here
+delay_ms = 100                                  # 0 activates immediately; maximum is 10000
+action = "overview-open"                        # Any normal Umbriel action is accepted
+
+[hot_corners.top_right]
+enabled = false
+delay_ms = 500
+action = "overview-close"
+
+[hot_corners.bottom_left]
+enabled = false
+delay_ms = 500
+action = "overview-toggle"
+
+[hot_corners.bottom_right]
+enabled = false
+delay_ms = 500
+action = "spawn:notify-send 'Bottom right'"
+
+# ─────────────────────── Security Context Rules ─────────────────────────────
+# Sandboxed clients receive a restricted Wayland global set. Grant extra
+# globals only to a narrowly matched application that genuinely needs them.
+# Documentation: https://docs.noctalia.dev/umbriel/security/#per-application-grants
+# ────────────────────────────────────────────────────────────────────────────
+
+# Grant a sandboxed clipboard manager both data-control protocol variants.
+# Uncomment the complete block and replace the example application ID.
+
+# [[security_context_rule]]
+# match.sandbox_engine = 'org\.flatpak'
+# match.app_id = 'org\.example\.ClipboardManager'
+# allow_globals = ["ext_data_control_manager_v1", "zwlr_data_control_manager_v1"]

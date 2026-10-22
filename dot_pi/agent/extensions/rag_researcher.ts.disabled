@@ -1,0 +1,326 @@
+/**
+ * RAG Researcher - local RAG & search proxy tools
+ *
+ * Talks to the rag-proxy (FastAPI) on http://127.0.0.1:5000.
+ * Provides ranked web search (local RAG + live web, reranked) and
+ * crawl-and-index of pages into the local knowledge base.
+ * Also exposes generate_text (now owned by colony.ts — auto-starts the colony container).
+ *
+ * Output: `content` is a compact plain-text summary (what the model sees);
+ * the full payload rides in `details`; a custom `renderResult` component
+ * renders the colored chat view (domains: local/user = accent, web = success).
+ */
+import { Type } from "@earendil-works/pi-ai";
+import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
+
+const PROXY_URL = "http://127.0.0.1:5000";
+
+// ---------------------------------------------------------------------------
+// shared helpers
+// ---------------------------------------------------------------------------
+
+function domainOf(url: string): string {
+	try {
+		return new URL(url).hostname.replace(/^www\./, "");
+	} catch {
+		return url;
+	}
+}
+
+function treeLines(headers: string[] | undefined): string[] {
+	// Only h1 + h2 are displayed (breadcrumb depth <= 2 segments); h3+
+	// headings stay in the backend payload but are pruned from the tree.
+	const filtered = (headers ?? []).filter((c) => c.split(" > ").length <= 2);
+	// Breadcrumbs ("A > B") become a box-drawing tree:
+	//   A
+	//   ├── B
+	interface Node {
+		label: string;
+		children: Node[];
+	}
+	const find = (nodes: Node[], label: string): Node | undefined =>
+		nodes.find((n) => n.label === label);
+	const roots: Node[] = [];
+	for (const crumb of filtered) {
+		let level = roots;
+		for (const part of crumb.split(" > ")) {
+			let node = find(level, part);
+			if (!node) {
+				node = { label: part, children: [] };
+				level.push(node);
+			}
+			level = node.children;
+		}
+	}
+	const out: string[] = [];
+	const walk = (nodes: Node[], prefix: string) => {
+		nodes.forEach((node, i) => {
+			const last = i === nodes.length - 1;
+			out.push(prefix + (last ? "└── " : "├── ") + node.label);
+			walk(node.children, prefix + (last ? "    " : "│   "));
+		});
+	};
+	walk(roots, "");
+	return out;
+}
+
+// Safe ANSI wrapper; falls back to plain text when theme is unavailable.
+function fg(
+	theme: { fg(token: string, text: string): string } | undefined,
+	token: string,
+	text: string,
+): string {
+	try {
+		return theme?.fg(token, text) ?? text;
+	} catch {
+		return text;
+	}
+}
+
+// local / disk-cached ("user" sources) vs live web.
+// Under the noctalia theme: warning -> accentAlt (#56949f teal),
+// success -> tert (#286983 blue).
+const USER_COLOR = "warning";
+const WEB_COLOR = "success";
+
+// ---------------------------------------------------------------------------
+// Tool 1: ranked web search
+// ---------------------------------------------------------------------------
+const rankedWebSearch = defineTool({
+	name: "ranked_web_search",
+	label: "Ranked Web Search",
+	description:
+		"Search the web using the local RAG proxy. Returns ranked and deduplicated results combining local RAG knowledge and live web search.",
+	parameters: Type.Object({
+		query: Type.String({ description: "Search query" }),
+	}),
+
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const resp = await fetch(`${PROXY_URL}/search`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ query: params.query }),
+		});
+		if (!resp.ok) {
+			throw new Error(`Search failed: ${resp.status} ${await resp.text()}`);
+		}
+		const data = await resp.json();
+		const results = data.results ?? [];
+		// Compact, model-facing summary: domain | title | score.
+		const text = results
+			.map(
+				(r: any) =>
+					`${domainOf(r.url ?? "")}  ${r.title || "(untitled)"}  —  ${
+						typeof r.score === "number" ? r.score.toFixed(2) : "?"
+					}`,
+			)
+			.join("\n");
+		return {
+			content: [{ type: "text", text: text || "no results" }],
+			details: { resultCount: results.length, results },
+		};
+	},
+
+	renderResult: (result, _opts, theme) => {
+		const results = (result.details as any)?.results ?? [];
+		const lines = results.map((r: any) => {
+			const dom = domainOf(r.url ?? "");
+			const color = r.source === "local" ? USER_COLOR : WEB_COLOR;
+			const score = typeof r.score === "number" ? r.score.toFixed(2) : "?";
+			return `${fg(theme, color, dom)}  ${r.title || "(untitled)"}  —  ${fg(theme, "muted", score)}`;
+		});
+		return new Text(lines.length ? lines.join("\n") : "no results", 0, 0);
+	},
+});
+
+// ---------------------------------------------------------------------------
+// Tool 2: crawl and index page (merged into /fetch; always forces a live
+// crawl + re-index, preserving the old /crawl-and-index semantics)
+// ---------------------------------------------------------------------------
+const crawlAndIndexPage = defineTool({
+	name: "crawl_and_index_page",
+	label: "Crawl and Index Page",
+	description:
+		"Crawl a web page and index its content into the local RAG knowledge base for future searches.",
+	parameters: Type.Object({
+		urls: Type.Array(Type.String({ description: "URL to crawl" }), {
+			description: "List of URLs to crawl",
+		}),
+	}),
+
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const resp = await fetch(`${PROXY_URL}/fetch`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				urls: params.urls.map((u: string) => ({ url: u })),
+				force_fetch: true,
+				source: "user",
+			}),
+		});
+		if (!resp.ok) {
+			throw new Error(
+				`Crawl/index failed: ${resp.status} ${await resp.text()}`,
+			);
+		}
+		const data = await resp.json();
+		const results = data.results ?? [];
+		const indexed = results.filter(
+			(r: { status?: string }) => r.status === "fetched_and_indexed",
+		).length;
+		const notIndexed = results.filter(
+			(r: { status?: string }) => r.status === "fetched_not_indexed",
+		);
+		const failed = results.filter(
+			(r: { status?: string }) => r.status === "failed",
+		);
+		return {
+			content: [
+				{
+					type: "text",
+					text:
+						`Indexed ${indexed}/${results.length} URLs.` +
+						(notIndexed.length
+							? ` Index pending/retry: ${notIndexed.map((r: { url?: string }) => r.url).join(", ")}.`
+							: "") +
+						(failed.length
+							? ` Failed: ${failed.map((r: { url?: string }) => r.url).join(", ")}`
+							: ""),
+				},
+			],
+			details: { results },
+		};
+	},
+
+	renderResult: (result, _opts, theme) => {
+		const results = (result.details as any)?.results ?? [];
+		const lines = results.map((r: any) => {
+			const dom = domainOf(r.url ?? "");
+			if (r.status === "fetched_and_indexed") {
+				return `✓ ${fg(theme, "success", dom)}  ${fg(theme, "muted", "indexed")}`;
+			}
+			if (r.status === "fetched_not_indexed") {
+				return `⚠ ${fg(theme, "warning", dom)}  ${fg(theme, "muted", "index pending/retry")}`;
+			}
+			return `✗ ${fg(theme, "err", dom)}  ${fg(theme, "muted", r.error ?? "failed")}`;
+		});
+		return new Text(lines.length ? lines.join("\n") : "no results", 0, 0);
+	},
+});
+
+// ---------------------------------------------------------------------------
+// Tool 3: fetch page content (disk cache any age, optional force refresh /
+// target section resolution / reindex / raw markdown)
+// ---------------------------------------------------------------------------
+const fetchPageContent = defineTool({
+	name: "fetch_page_content",
+	label: "Fetch Page Content",
+	description:
+		"Fetch a webpage from the local RAG proxy. Returns a compact summary (domain, title, header hierarchy); the full markdown is available via raw=true. " +
+		"Serves from the on-disk document cache regardless of age (age_days is reported, not judged); " +
+		"set force_fetch=true to bypass the cache and force a live crawl + re-index. Set reindex=true to rebuild the search index " +
+		"from the disk file without crawling (no-op when content is unchanged). Optionally pass target (a section path from " +
+		"/search results) to return just that section.",
+	parameters: Type.Object({
+		url: Type.String({ description: "URL to fetch" }),
+		target: Type.Optional(
+			Type.String({
+				description:
+					"Optional section path (from /search 'target') to return only that section",
+			}),
+		),
+		raw: Type.Optional(
+			Type.Boolean({
+				description:
+					"Return the full markdown instead of the compact summary (default: false)",
+			}),
+		),
+		reindex: Type.Optional(
+			Type.Boolean({
+				description:
+					"Reconcile the search index with the disk file (no crawl; no-op when unchanged, default: false)",
+			}),
+		),
+		force_fetch: Type.Optional(
+			Type.Boolean({
+				description:
+					"Bypass cache and force a live crawl + re-index (default: false)",
+			}),
+		),
+	}),
+
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const resp = await fetch(`${PROXY_URL}/fetch`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				urls: [{ url: params.url, target: params.target ?? undefined }],
+				reindex: params.reindex ?? false,
+				force_fetch: params.force_fetch ?? false,
+				source: "user",
+			}),
+		});
+		if (!resp.ok) {
+			throw new Error(`Fetch failed: ${resp.status} ${await resp.text()}`);
+		}
+		const data = await resp.json();
+		const first = (data.results ?? [])[0];
+		if (!first) {
+			return { content: [{ type: "text", text: "no result" }], details: {} };
+		}
+		const details = {
+			url: first.url,
+			status: first.status,
+			origin: first.origin,
+			target: first.target,
+			age_days: first.age_days,
+			error: first.error,
+			title: first.title ?? "",
+			headers: first.headers ?? [],
+			markdown: first.content ?? "",
+		};
+		if (params.raw) {
+			return {
+				content: [{ type: "text", text: details.markdown || "no content" }],
+				details,
+			};
+		}
+		// Compact, model-facing summary: title/domain, status, header tree.
+		const dom = domainOf(details.url ?? "");
+		const tree = treeLines(details.headers);
+		const text = [
+			`${details.title || dom}  (${dom})`,
+			`status: ${details.status} · origin: ${details.origin} · age: ${details.age_days ?? "-"}d`,
+			...(tree.length ? ["", ...tree] : []),
+		].join("\n");
+		return { content: [{ type: "text", text }], details };
+	},
+
+	renderResult: (result, _opts, theme) => {
+		const d = (result.details as any) ?? {};
+		const dom = domainOf(d.url ?? "");
+		const color = d.origin === "live_web" ? WEB_COLOR : USER_COLOR;
+		const lines: string[] = [fg(theme, color, dom)];
+		if (d.title) lines.push(d.title);
+		lines.push(
+			fg(
+				theme,
+				"muted",
+				`status: ${d.status ?? "?"} · age: ${d.age_days ?? "-"}d`,
+			),
+		);
+		const tree = treeLines(d.headers);
+		if (tree.length) {
+			lines.push("");
+			lines.push(...tree.map((l) => fg(theme, "muted", l)));
+		}
+		return new Text(lines.join("\n"), 0, 0);
+	},
+});
+
+export default function (pi: ExtensionAPI) {
+	pi.registerTool(rankedWebSearch);
+	pi.registerTool(crawlAndIndexPage);
+	pi.registerTool(fetchPageContent);
+}

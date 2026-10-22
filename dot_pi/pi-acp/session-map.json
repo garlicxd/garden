@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "sessions": {
+    "01a0d2fa-2359-7220-80d5-029b59373cfb": {
+      "sessionId": "01a0d2fa-2359-7220-80d5-029b59373cfb",
+      "cwd": "/home/garlic",
+      "sessionFile": "/home/garlic/.pi/agent/sessions/--home-garlic--/2026-09-24T10-33-23-546Z_01a0d2fa-2359-7220-80d5-029b59373cfb.jsonl",
+      "updatedAt": "2026-10-06T11:54:17.616Z"
+    },
+    "01a11118-d6f2-73a1-afc5-23facefa060e": {
+      "sessionId": "01a11118-d6f2-73a1-afc5-23facefa060e",
+      "cwd": "/home/garlic",
+      "sessionFile": "/home/garlic/.pi/agent/sessions/--home-garlic--/2026-10-06T12-03-22-994Z_01a11118-d6f2-73a1-afc5-23facefa060e.jsonl",
+      "updatedAt": "2026-10-06T23:24:35.255Z"
+    },
+    "01a11392-066b-75cf-8c52-aa8d24ed5296": {
+      "sessionId": "01a11392-066b-75cf-8c52-aa8d24ed5296",
+      "cwd": "/home/garlic",
+      "sessionFile": "/home/garlic/.pi/agent/sessions/--home-garlic--/2026-10-06T23-34-59-436Z_01a11392-066b-75cf-8c52-aa8d24ed5296.jsonl",
+      "updatedAt": "2026-10-22T10:27:04.345Z"
+    }
+  }
+}

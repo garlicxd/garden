@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# lid-dpms — blank/unblank ONLY the internal panel on lid events.
+# External monitors are left alone, so clamshell/docked mode works.
+# Usage: lid-dpms close | open
+#
+# Called from Umbriel's [events] with an absolute path:
+#   lid_close = "$HOME/.local/bin/lid-dpms close"
+#   lid_open  = "$HOME/.local/bin/lid-dpms open"
+#
+# No wlopm: Umbriel does not expose wlr-output-power-management-v1, so wlopm
+# fails on every invocation. Umbriel has native DPMS actions instead:
+#   umbriel msg dpms-off:<output> / dpms-on:<output>
+set -euo pipefail
+
+STATE_FILE="${XDG_RUNTIME_DIR:-/tmp}/lid-dpms-$UID.internal-output"
+
+# One connector name per line from `umbriel outputs --json`.
+# Verified shape: a bare JSON array of objects with a "name" field.
+list_outputs() {
+    if command -v jq >/dev/null 2>&1; then
+        # Verified: `umbriel outputs --json` returns a BARE ARRAY. Note `.outputs`
+        # applied to an array is a jq *error*, not null, so `(.outputs // .)` blows
+        # up -- use an explicit type test.
+        umbriel outputs --json | jq -r \
+          'if type == "object" then (.outputs // [])[] else .[] end | .name'
+    else
+        umbriel outputs --json | python3 -c \
+          'import json,sys; d=json.load(sys.stdin); [print(o["name"]) for o in (d.get("outputs", d) if isinstance(d, dict) else d)]'
+    fi
+}
+
+# Internal panel is the eDP-* / LVDS-* connector.
+internal_output() {
+    # `set -e` does NOT propagate out of a command-substitution subshell (verified),
+    # so failures must be handled explicitly or they vanish into a silent no-op.
+    local names
+    names=$(list_outputs) || {
+        echo "lid-dpms: could not list outputs (umbriel/jq failed)" >&2
+        return 1
+    }
+    printf '%s\n' "$names" | grep -m1 -E '^(eDP|LVDS)-' || true
+}
+
+case "${1:-}" in
+  close)
+    out=$(internal_output) || exit 1
+    [[ -z "$out" ]] && exit 0          # external-only: nothing to blank
+    umbriel msg "dpms-off:$out"
+    printf '%s\n' "$out" > "$STATE_FILE"
+    ;;
+  open)
+    if [[ -f "$STATE_FILE" ]]; then
+      umbriel msg "dpms-on:$(cat "$STATE_FILE")"
+      rm -f "$STATE_FILE"
+    fi
+    ;;
+  *)
+    echo "usage: $0 close|open" >&2; exit 2 ;;
+esac

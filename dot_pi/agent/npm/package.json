@@ -2,10 +2,12 @@
   "name": "pi-extensions",
   "private": true,
   "dependencies": {
-    "@alexanderfortin/pi-deepseek-usage": "^0.3.11",
+    "@alexanderfortin/pi-deepseek-usage": "^0.3.20",
     "@hypabolic/pi-hypa": "^0.1.10",
+    "@juicesharp/rpiv-web-tools": "^2.9.0",
     "pi-agent-browser-native": "^0.2.65",
-    "pi-deepseek-search": "^1.0.15",
+    "pi-cache-optimizer": "^2.9.1",
+    "pi-deepseek-search": "^1.0.20",
     "pi-lens": "^3.8.69"
   }
 }

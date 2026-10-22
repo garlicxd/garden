@@ -1,0 +1,131 @@
+/**
+ * RAG Researcher - local RAG & search proxy tools
+ *
+ * Talks to the rag-proxy (FastAPI) on http://127.0.0.1:5000.
+ * Provides ranked web search (local RAG + live web, reranked) and
+ * crawl-and-index of pages into the local knowledge base.
+ */
+import { Type } from "@earendil-works/pi-ai";
+import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+const PROXY_URL = "http://127.0.0.1:5000";
+
+// Tool 1: ranked web search
+const rankedWebSearch = defineTool({
+	name: "ranked_web_search",
+	label: "Ranked Web Search",
+	description:
+		"Search the web using the local RAG proxy. Returns ranked and deduplicated results combining local RAG knowledge and live web search.",
+	parameters: Type.Object({
+		query: Type.String({ description: "Search query" }),
+	}),
+
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const resp = await fetch(`${PROXY_URL}/search`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ query: params.query }),
+		});
+		if (!resp.ok) {
+			throw new Error(`Search failed: ${resp.status} ${await resp.text()}`);
+		}
+		const data = await resp.json();
+		return {
+			content: [{ type: "text", text: JSON.stringify(data.results, null, 2) }],
+			details: { resultCount: data.results.length },
+		};
+	},
+});
+
+// Tool 2: crawl and index page (merged into /fetch; always forces a live
+// crawl + re-index, preserving the old /crawl-and-index semantics)
+const crawlAndIndexPage = defineTool({
+	name: "crawl_and_index_page",
+	label: "Crawl and Index Page",
+	description:
+		"Crawl a web page and index its content into the local RAG knowledge base for future searches.",
+	parameters: Type.Object({
+		urls: Type.Array(Type.String({ description: "URL to crawl" }), {
+			description: "List of URLs to crawl",
+		}),
+	}),
+
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const resp = await fetch(`${PROXY_URL}/fetch`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ urls: params.urls, force_fetch: true, source: "user" }),
+		});
+		if (!resp.ok) {
+			throw new Error(`Crawl/index failed: ${resp.status} ${await resp.text()}`);
+		}
+		const data = await resp.json();
+		const results = data.results ?? [];
+		const indexed = results.filter((r: { status?: string }) => r.status === "fetched_and_indexed").length;
+		const notIndexed = results.filter((r: { status?: string }) => r.status === "fetched_not_indexed");
+		const failed = results.filter((r: { status?: string }) => r.status === "failed");
+		return {
+			content: [
+				{
+					type: "text",
+					text:
+						`Indexed ${indexed}/${results.length} URLs.` +
+						(notIndexed.length
+							? ` Index pending/retry: ${notIndexed.map((r: { url?: string }) => r.url).join(", ")}.`
+							: "") +
+						(failed.length
+							? ` Failed: ${failed.map((r: { url?: string }) => r.url).join(", ")}`
+							: ""),
+				},
+			],
+			details: data,
+		};
+	},
+});
+
+// Tool 3: fetch page content (disk-cache-first, optional force refresh)
+const fetchPageContent = defineTool({
+	name: "fetch_page_content",
+	label: "Fetch Page Content",
+	description:
+		"Fetch a webpage's Markdown (with YAML frontmatter: url/title/source/crawled_at/updated_at/summary/domain/content_hash/word_count/chunk_count) " +
+		"from the local RAG proxy. Serves from the on-disk document cache when fresh (7-day TTL); set force_fetch=true " +
+		"to bypass the cache and force a live crawl + re-index.",
+	parameters: Type.Object({
+		url: Type.String({ description: "URL to fetch" }),
+		force_fetch: Type.Optional(
+			Type.Boolean({
+				description: "Bypass cache and force a live crawl + re-index (default: false)",
+			}),
+		),
+	}),
+
+	async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		const resp = await fetch(`${PROXY_URL}/fetch`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				urls: [params.url],
+				force_fetch: params.force_fetch ?? false,
+				source: "user",
+			}),
+		});
+		if (!resp.ok) {
+			throw new Error(`Fetch failed: ${resp.status} ${await resp.text()}`);
+		}
+		const data = await resp.json();
+		const first = (data.results ?? [])[0];
+		return {
+			content: [{ type: "text", text: first?.markdown ?? JSON.stringify(data) }],
+			details: first
+				? { status: first.status, origin: first.origin, url: first.url, error: first.error }
+				: { status: "empty", url: params.url },
+		};
+	},
+});
+
+export default function (pi: ExtensionAPI) {
+	pi.registerTool(rankedWebSearch);
+	pi.registerTool(crawlAndIndexPage);
+	pi.registerTool(fetchPageContent);
+}
