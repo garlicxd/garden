@@ -1,4 +1,4 @@
-config_version = 15
+config_version = 16
 
 [bar.default]
 background_opacity = 0.4999999888241291
@@ -31,7 +31,7 @@ widget_spacing = 10
     accordion_direction = "end"
     border_width = 1.0
     enabled = true
-    fill = "surface_variant"
+    fill = "surface_container"
     id = "g2"
     members = [ "tray", "mini-docker", "bar" ]
     opacity = 0.55000001192092896
@@ -42,7 +42,7 @@ widget_spacing = 10
     accordion_direction = "end"
     border_width = 1.0
     enabled = true
-    fill = "surface_variant"
+    fill = "surface_container"
     id = "g3"
     members = [ "bar_2", "volume", "audio_visualizer", "media", "launcher" ]
     opacity = 0.55000001192092896
@@ -53,7 +53,7 @@ widget_spacing = 10
     accordion_direction = "end"
     border_width = 1.0
     enabled = true
-    fill = "surface_variant"
+    fill = "surface_container"
     id = "g4"
     members = [ "network", "bluetooth", "brightness", "battery" ]
     opacity = 0.55000001192092896
@@ -64,7 +64,7 @@ widget_spacing = 10
     accordion_direction = "end"
     border_width = 1.0
     enabled = true
-    fill = "surface_variant"
+    fill = "surface_container"
     id = "g1"
     members = [ "notifications", "clock", "weather" ]
     opacity = 0.55000001192092896
@@ -136,16 +136,16 @@ widget_order = [ "lockscreen-login-box@WL-1", "lockscreen-login-box@HDMI-A-1", "
     [lockscreen_widgets.widget."lockscreen-login-box@HDMI-A-1"]
     box_height = 196.0
     box_width = 810.0
-    cx = 1920.0
-    cy = 1978.0
+    cx = 960.0
+    cy = 989.0
     output = "HDMI-A-1"
-    placement_height = 2160.0
-    placement_width = 3840.0
+    placement_height = 1080.0
+    placement_width = 1920.0
     rotation = 0.0
     type = "login_box"
 
         [lockscreen_widgets.widget."lockscreen-login-box@HDMI-A-1".settings]
-        background_color = "surface_variant"
+        background_color = "surface_container"
         background_opacity = 0.88
         background_radius = 12.0
         center_password_text = false
@@ -156,6 +156,7 @@ widget_order = [ "lockscreen-login-box@WL-1", "lockscreen-login-box@HDMI-A-1", "
         show_keyboard_layout = true
         show_login_button = true
         show_media = true
+        show_password_reveal = true
         show_session_buttons = true
         show_unlock_hint = true
         show_weather = true
@@ -172,7 +173,7 @@ widget_order = [ "lockscreen-login-box@WL-1", "lockscreen-login-box@HDMI-A-1", "
     type = "login_box"
 
         [lockscreen_widgets.widget."lockscreen-login-box@WL-1".settings]
-        background_color = "surface_variant"
+        background_color = "surface_container"
         background_opacity = 0.88
         background_radius = 12.0
         center_password_text = false
@@ -183,6 +184,7 @@ widget_order = [ "lockscreen-login-box@WL-1", "lockscreen-login-box@HDMI-A-1", "
         show_keyboard_layout = true
         show_login_button = true
         show_media = true
+        show_password_reveal = true
         show_session_buttons = true
         show_unlock_hint = true
         show_weather = true
@@ -199,7 +201,7 @@ widget_order = [ "lockscreen-login-box@WL-1", "lockscreen-login-box@HDMI-A-1", "
     type = "login_box"
 
         [lockscreen_widgets.widget."lockscreen-login-box@eDP-1".settings]
-        background_color = "surface_variant"
+        background_color = "surface_container"
         background_opacity = 0.88
         background_radius = 12.0
         center_password_text = false
@@ -210,6 +212,7 @@ widget_order = [ "lockscreen-login-box@WL-1", "lockscreen-login-box@HDMI-A-1", "
         show_keyboard_layout = true
         show_login_button = true
         show_media = true
+        show_password_reveal = true
         show_session_buttons = true
         show_unlock_hint = true
         show_weather = true
@@ -291,12 +294,10 @@ source = "community"
         "pi-agent",
         "brave-origin",
         "discord",
-        "blender",
         "obsidian",
         "zed",
         "heroiclauncher",
         "prismlauncher",
-        "fastfetch",
         "obs",
         "zathura",
         "papirus-icons",

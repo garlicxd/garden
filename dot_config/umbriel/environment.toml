@@ -28,5 +28,5 @@ CLUTTER_BACKEND = "wayland"
 SDL_VIDEODRIVER = "wayland"
 
 # --- Cursor ---
-XCURSOR_THEME = "geared-brass-32x"
-XCURSOR_SIZE = "32"
+XCURSOR_THEME = "geared-brass-64x"
+XCURSOR_SIZE = "24"

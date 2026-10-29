@@ -151,7 +151,8 @@ center_underfull_strip = true                   # Center a strip narrower than t
 center_focused = "never"                        # never, always, or on_overflow
 
 [layout.dwindle]
-# preserve_split = false                        # Keep every split direction fixed after creation                   # Exits fullscreen when a new window is opened in the workspace
+# preserve_split = false                        # Keep every split direction fixed after creation
+# Exiting fullscreen on a new window is the shared [layout] new_exits_fullscreen
 
 [layout.master]
 position = "left"                               # left, right, or center master area

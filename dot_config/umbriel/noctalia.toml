@@ -19,7 +19,26 @@ background_tint = "#e5d8be88"
 badge = "#b56839FF"
 workspace_background = "#e5d8beFF"
 
+[colors.tab_bar]
+background = "#d6c8adFF"
+text = "#5c5047FF"
+active = "#b56839FF"
+active_text = "#e5d8beFF"
+active_unfocused = "#d6c8adFF"
+active_unfocused_text = "#3a322dFF"
+urgent = "#a64248FF"
+urgent_text = "#e5d8beFF"
+
+[colors.title_bar]
+background = "#d6c8adFF"
+background_unfocused = "#e5d8beFF"
+text = "#3a322dFF"
+text_unfocused = "#5c5047FF"
+close = "#a64248FF"
+maximize = "#b56839FF"
+minimize = "#8f6830FF"
+
 [[window_rule]]
 match.is_scratchpad = true
 border_color_focused = "#4e5c3eFF"
-border_color_unfocused = "#a8c18cFF"
+border_color_unfocused = "#b7b297FF"
