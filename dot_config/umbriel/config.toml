@@ -24,13 +24,13 @@
 
 [include]
 files = [
-    "appearance.toml" ,
-    "keybinds.toml",
-    "inputs.toml",
-    "outputs.toml",
-    "rules.toml",
-    "environment.toml",
-    ]                                      # Example: ["appearance.toml", "outputs.toml"]
+  "appearance.toml",
+  "keybinds.toml",
+  "inputs.toml",
+  "outputs.toml",
+  "rules.toml",
+  "environment.toml",
+] # Example: ["appearance.toml", "outputs.toml"]
 
 [include.optional]
 files = ["noctalia.toml"] # Example: ["~/.config/umbriel/noctalia.toml"]
@@ -43,16 +43,18 @@ files = ["noctalia.toml"] # Example: ["~/.config/umbriel/noctalia.toml"]
 
 [general]
 autostart = [ # Commands run once when the session starts
-    "noctalia",
-    "kitty",
-    "gsettings set org.gnome.desktop.interface cursor-theme 'geared-brass-64x'",
-    "gsettings set org.gnome.desktop.interface cursor-size 24"
+  "noctalia",
+  "kitty",
+  "gsettings set org.gnome.desktop.interface cursor-theme 'geared-brass-64x'",
+  "gsettings set org.gnome.desktop.interface cursor-size 24",
 ]
 # mod_key = "Super"                             # Force Super instead of nested-session Alt
-xwayland = true                                 # Requires xwayland-satellite; restart to change
-show_cheatsheet = true                          # Show the keybind overlay on startup
-focus_on_activate = false                       # Do not let unsolicited requests steal focus
-honor_restored_maximize = false                 # Honor restored maximized state
+xwayland = true                 # Requires xwayland-satellite; restart to change
+xwayland_native_resolution = true # X11 apps see physical size, so they render sharp (restart)
+xwayland_xsettings = true       # Announce UI scale and cursor to X11 apps via XSETTINGS
+show_cheatsheet = true          # Show the keybind overlay on startup
+focus_on_activate = false       # Do not let unsolicited requests steal focus
+honor_restored_maximize = false # Honor restored maximized state
 
 # Native GPU exclusions
 # Changes require a restart. Use a PCI address if the GPU may start bound to vfio-pci.
@@ -69,7 +71,7 @@ honor_restored_maximize = false                 # Honor restored maximized state
 
 [events]
 lid_close = "$HOME/.local/bin/lid-dpms close"
-lid_open  = "$HOME/.local/bin/lid-dpms open"
+lid_open = "$HOME/.local/bin/lid-dpms open"
 
 # ────────────────────────────── Workspaces ──────────────────────────────────
 # Choose global workspace behavior. Each output uses dynamic workspaces unless
@@ -79,8 +81,8 @@ lid_open  = "$HOME/.local/bin/lid-dpms open"
 
 [workspaces]
 # Each output supports at most 64 workspaces, including empty ones.
-back_and_forth = false                          # Re-select active workspace to switch back
-empty_above = false                             # Keep one empty workspace above active range
+back_and_forth = false # Re-select active workspace to switch back
+empty_above = false    # Keep one empty workspace above active range
 
 # Workspace entries customize layout. An `index` follows the current position
 # without creating a workspace. A `name` also materializes a persistent named
@@ -132,33 +134,33 @@ empty_above = false                             # Keep one empty workspace above
 # ────────────────────────────────────────────────────────────────────────────
 
 [layout]
-mode = "scrolling"                              # scrolling, dwindle, or master
-gap = 8                                         # Logical pixels between tiles, 0-500
-extent_presets = [0.333, 0.5, 0.667]             # Primary and secondary extent fractions
+mode = "scrolling"                   # scrolling, dwindle, or master
+gap = 8                              # Logical pixels between tiles, 0-500
+extent_presets = [0.333, 0.5, 0.667] # Primary and secondary extent fractions
 
 [layout.struts]
 # Signed logical pixels reserved after panel exclusive zones. Negative values
 # expand the tiled area beyond that edge.
-left = 10                                        # -65535 to 65535
+left = 10  # -65535 to 65535
 right = 10
 top = 0
 bottom = 6
 
 [layout.scrolling]
 # The strip axis is perpendicular to the output's workspace_axis.
-default_extent_fraction = 0.5                   # Initial extent for new columns, 0.1-1.0
-center_underfull_strip = true                   # Center a strip narrower than the viewport
-center_focused = "never"                        # never, always, or on_overflow
+default_extent_fraction = 0.5 # Initial extent for new columns, 0.1-1.0
+center_underfull_strip = true # Center a strip narrower than the viewport
+center_focused = "never"      # never, always, or on_overflow
 
 [layout.dwindle]
 # preserve_split = false                        # Keep every split direction fixed after creation
 # Exiting fullscreen on a new window is the shared [layout] new_exits_fullscreen
 
 [layout.master]
-position = "left"                               # left, right, or center master area
-default_width_fraction = 0.55                   # Initial master area fraction, 0.1-0.9
-new_on_top = true                               # Put new windows at the top of the stack
-new_becomes_master = false                      # New windows take the master slot
+position = "left"             # left, right, or center master area
+default_width_fraction = 0.55 # Initial master area fraction, 0.1-0.9
+new_on_top = true             # Put new windows at the top of the stack
+new_becomes_master = false    # New windows take the master slot
 
 # ─────────────────────── Overview and Hot Corners ───────────────────────────
 # Configure the all-workspaces overview and pointer-triggered corner actions.
@@ -168,9 +170,9 @@ new_becomes_master = false                      # New windows take the master sl
 # ────────────────────────────────────────────────────────────────────────────
 
 [overview]
-zoom = 0.5                                      # Workspace scale in overview, 0.1-0.75
-scroll_factor_horizontal = 1.0                  # Overview gesture/wheel multiplier, left and right, 0.1-10.0
-scroll_factor_vertical = 1.0                    # Overview gesture/wheel multiplier, up and down, 0.1-10.0
+zoom = 0.5                     # Workspace scale in overview, 0.1-0.75
+scroll_factor_horizontal = 1.0 # Overview gesture/wheel multiplier, left and right, 0.1-10.0
+scroll_factor_vertical = 1.0   # Overview gesture/wheel multiplier, up and down, 0.1-10.0
 # Pinned windows stay hidden until overview closes; visible scratchpads are dismissed.
 # background_blur = true                        # Blur the wallpaper behind overview rows
 # workspace_wallpaper = true                    # Mirror wallpapers inside workspace previews
@@ -178,9 +180,9 @@ scroll_factor_vertical = 1.0                    # Overview gesture/wheel multipl
 # shortcut_keys = "1234567890"                  # Badge keys in preference order
 
 [hot_corners.top_left]
-enabled = true                                  # Open the overview after resting here
-delay_ms = 100                                  # 0 activates immediately; maximum is 10000
-action = "overview-open"                        # Any normal Umbriel action is accepted
+enabled = true           # Open the overview after resting here
+delay_ms = 100           # 0 activates immediately; maximum is 10000
+action = "overview-open" # Any normal Umbriel action is accepted
 
 [hot_corners.top_right]
 enabled = false

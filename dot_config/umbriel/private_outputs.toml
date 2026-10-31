@@ -4,13 +4,17 @@
 
 [output."Panasonic Industry Company Panasonic-TV 0x01010101"]
 position = [1600, 0]
+scale = 2                   # Logical size is mode size divided by scale
 
 [output."Samsung Display Corp. ATNA40HQ01-0  Unknown"]
 mode = "2880x1800@120"
 position = [0, 0]
-scale = 1.8                                     # Logical size is mode size divided by scale
+scale = 1.8                 # Logical size is mode size divided by scale
 transform = "normal"
 vrr = "disabled"
 tearing = false
 hdr = "auto"
 workspace_axis = "vertical"
+
+[output."Samsung Electric Company SAMSUNG 0x01000E00"]
+position = [1600, 0]
